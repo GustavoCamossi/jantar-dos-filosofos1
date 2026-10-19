@@ -1,0 +1,1533 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Jogo interativo do jantar dos filósofos para ensinar deadlock em Sistemas Operacionais.">
+<title>Jantar dos Filósofos</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Mono:wght@400;700&family=Atkinson+Hyperlegible+Next:wght@400;600;700;800&family=Marcellus&display=swap">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<style>
+/* Layout: a mesa ilustrada é o palco (esquerda, grande); narrador e condições de Coffman ao lado; embaixo, ficha do processo, grafo e código. Corpo grande, pensado para projetor. */
+:root{
+  --bg:#E9EFF6; --panel:#FFFFFF; --ink:#10233F; --muted:#4A5D77; --line:#C3D0E1;
+  --accent:#1D4FA3; --accent-ink:#FFFFFF; --accent-soft:#DCE7F7;
+  --table:#1B3F7A; --table-edge:#122E5C; --on-table:#EAF2FF; --meander:#EBCB7A;
+  --plate:#FBFCFE; --plate-rim:#B9C8DC; --pasta:#E8B647; --pasta-line:#B07A1F;
+  --fork:#E4D3AE; --fork-held:#FFD166; --fork-dead:#FF8E9A; --eat-ring:#63E6A1; --wait-arrow:#FFC069;
+  --think:#3E5F8F; --think-soft:#D9E4F2;
+  --hungry:#9A5600; --hungry-soft:#FBE6BE;
+  --eat:#17773F; --eat-soft:#D2EFDD;
+  --dead:#B81F33; --dead-soft:#FAD9DE;
+  --live:#7A3FA0; --live-soft:#EBDDF5;
+  --f-display:'Marcellus','Palatino Linotype',Palatino,Georgia,serif;
+  --f-body:'Atkinson Hyperlegible Next','Atkinson Hyperlegible','Segoe UI',system-ui,sans-serif;
+  --f-mono:'Atkinson Hyperlegible Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1525; --panel:#132137; --ink:#E9F0FA; --muted:#A0B2CB; --line:#2B3E5C;
+    --accent:#86B4FF; --accent-ink:#0B1525; --accent-soft:#1B2F50;
+    --table:#1E4A92; --table-edge:#3566B5; --on-table:#EEF4FF; --meander:#EBCB7A;
+    --plate:#F4F7FB; --plate-rim:#A9BBD3;
+    --think:#9DB6DB; --think-soft:#22344E;
+    --hungry:#F4B74A; --hungry-soft:#45340E;
+    --eat:#57D08F; --eat-soft:#113B27;
+    --dead:#FF7584; --dead-soft:#4A1821;
+    --live:#C99BEA; --live-soft:#35204A;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1525; --panel:#132137; --ink:#E9F0FA; --muted:#A0B2CB; --line:#2B3E5C;
+  --accent:#86B4FF; --accent-ink:#0B1525; --accent-soft:#1B2F50;
+  --table:#1E4A92; --table-edge:#3566B5; --on-table:#EEF4FF; --meander:#EBCB7A;
+  --plate:#F4F7FB; --plate-rim:#A9BBD3;
+  --think:#9DB6DB; --think-soft:#22344E;
+  --hungry:#F4B74A; --hungry-soft:#45340E;
+  --eat:#57D08F; --eat-soft:#113B27;
+  --dead:#FF7584; --dead-soft:#4A1821;
+  --live:#C99BEA; --live-soft:#35204A;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:18px/1.5 var(--f-body);padding-inline:clamp(16px,2.6vw,40px);padding-block:18px 48px}
+@media (min-width:1500px){body{font-size:20px}}
+h1,h2,h3,p,ul,dl,dd,fieldset,legend{margin:0;padding:0}
+ul{list-style:none}
+fieldset{border:0;min-width:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+
+.wrap{max-width:1640px;margin-inline:auto;display:grid;gap:18px}
+
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 40px}
+.eyebrow{font-size:.78em;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font:400 clamp(1.9rem,3.6vw,3rem)/1.05 var(--f-display);text-wrap:balance}
+.lede{max-width:54ch;color:var(--muted);flex:1 1 320px;min-width:0}
+
+.bar{display:flex;flex-wrap:wrap;gap:14px 36px;align-items:flex-end;border-block:2px solid var(--line);padding-block:12px}
+.group{display:grid;gap:8px}
+.group legend{font-size:.76em;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{position:relative;display:inline-flex}
+.pill input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.pill span{display:block;padding:8px 16px;border:2px solid var(--line);border-radius:999px;background:var(--panel);font-weight:600;line-height:1.2}
+.pill input:hover + span{border-color:var(--accent)}
+.pill input:checked + span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pill input:focus-visible + span{outline:3px solid var(--accent);outline-offset:3px}
+.opts .pills{gap:6px 18px;padding-block:8px}
+
+.main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:26px;align-items:start}
+@media (max-width:1060px){.main{grid-template-columns:minmax(0,1fr)}}
+.stage,.panel{display:grid;gap:14px;min-width:0}
+.lower{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:26px;align-items:start;border-top:2px solid var(--line);padding-top:18px}
+
+/* narrador */
+.narr{display:grid;gap:10px;padding:16px 20px;border:3px solid var(--accent);border-radius:16px;background:var(--panel)}
+.narr-top{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.narr-step{font:700 .8em var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.narr-slide{font-size:.8em;font-weight:700;padding:3px 12px;border-radius:999px;background:var(--accent-soft);color:var(--ink)}
+.narr h2{font:400 1.7em/1.15 var(--f-display);text-wrap:balance}
+#narr-text{font-size:1.06em;max-width:64ch}
+.quiz{display:grid;gap:8px;padding:12px 14px;border-radius:12px;background:var(--accent-soft)}
+.quiz-q{font-weight:700}
+.quiz-q::before{content:"Pergunta para a turma";display:block;font-size:.74em;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.quiz-opts{display:flex;flex-wrap:wrap;gap:8px}
+.qopt{padding:8px 14px;border:2px solid var(--line);border-radius:10px;background:var(--panel);font-weight:600;cursor:pointer;text-align:left}
+.qopt:hover{border-color:var(--accent)}
+.qopt:disabled{cursor:default}
+.qopt.right{border-color:var(--eat);background:var(--eat-soft);color:var(--eat)}
+.qopt.wrong{border-color:var(--dead);background:var(--dead-soft);color:var(--dead)}
+.quiz-why{font-weight:600}
+.narr-nav{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.dots{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 200px;justify-content:center}
+.dot{width:14px;height:14px;padding:0;border-radius:50%;border:2px solid var(--accent);background:transparent;cursor:pointer}
+.dot.on{background:var(--accent);transform:scale(1.25)}
+.dot.done{background:var(--accent-soft)}
+.dot.q{border-radius:3px}
+.narr-keys{font-size:.8em;color:var(--muted)}
+
+.status{display:grid;gap:2px;padding:12px 18px;border:2px solid var(--line);border-radius:14px;background:var(--panel);min-height:5.4em;align-content:center}
+.status strong{font:400 1.35em/1.2 var(--f-display);color:var(--accent)}
+.status span{min-width:0}
+.status[data-kind="dead"]{background:var(--dead-soft);border-color:var(--dead)}
+.status[data-kind="dead"] strong{color:var(--dead)}
+.status[data-kind="live"]{background:var(--live-soft);border-color:var(--live)}
+.status[data-kind="live"] strong{color:var(--live)}
+.status[data-kind="starve"],.status[data-kind="teach"]{background:var(--hungry-soft);border-color:var(--hungry)}
+.status[data-kind="starve"] strong,.status[data-kind="teach"] strong{color:var(--hungry)}
+
+/* mesa */
+#mesa{display:block;width:100%;height:auto;max-height:min(70vh,860px);user-select:none;-webkit-user-select:none}
+.tabletop{fill:var(--table);stroke:var(--table-edge);stroke-width:5}
+.meander{fill:none;stroke:var(--meander);stroke-width:1.8;opacity:.9}
+.slot{font:700 13px var(--f-mono);fill:var(--table);text-anchor:middle;dominant-baseline:central}
+.slot-bg{fill:var(--meander)}
+.c-label{font:700 12px var(--f-body);letter-spacing:.16em;fill:var(--on-table);opacity:.8;text-anchor:middle}
+.c-num{font:400 42px var(--f-display);fill:var(--on-table);text-anchor:middle}
+.c-sala{font:700 14px var(--f-mono);fill:var(--meander);text-anchor:middle}
+.plate{fill:var(--plate);stroke:var(--plate-rim);stroke-width:2}
+.plate-in{fill:none;stroke:var(--plate-rim);stroke-width:1.2}
+.pasta{fill:var(--pasta)}
+.pasta-l{fill:none;stroke:var(--pasta-line);stroke-width:1.6;stroke-linecap:round}
+.ring{fill:none;stroke:var(--eat-ring);stroke-width:5;stroke-linecap:round;opacity:0;transition:opacity .2s}
+.fork polygon{fill:var(--fork);transition:fill .2s}
+.fork.held polygon{fill:var(--fork-held)}
+.fork.dead polygon{fill:var(--fork-dead)}
+.arrow{fill:none;stroke:var(--wait-arrow);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.arrow.dead{stroke:var(--fork-dead)}
+.stamp{opacity:0;pointer-events:none;transform-box:fill-box;transform-origin:center;transform:rotate(-8deg)}
+.stamp.on{opacity:1}
+.stamp rect{fill:var(--panel);stroke:var(--dead);stroke-width:6;opacity:.95}
+.stamp text{font:800 44px var(--f-body);letter-spacing:.08em;fill:var(--dead);text-anchor:middle;dominant-baseline:central}
+.stamp.lv rect{stroke:var(--live)} .stamp.lv text{fill:var(--live)}
+
+.phil{cursor:pointer}
+.phil .disc{stroke-width:5;transition:fill .25s,stroke .25s}
+.phil:hover .disc{stroke-width:7}
+.phil .pulse{fill:none;stroke-width:3;opacity:0;transform-box:fill-box;transform-origin:center}
+.phil .badge{fill:var(--panel);stroke-width:2.5}
+.phil .badge-t{font:700 14px var(--f-mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.spot-ring{fill:none;stroke:var(--accent);stroke-width:4;stroke-dasharray:10 7;opacity:0;transform-box:fill-box;transform-origin:center}
+.phil.spot .spot-ring{opacity:1}
+.pname{font:400 21px var(--f-display);fill:var(--ink);text-anchor:middle;pointer-events:none}
+.pstate{font:700 16px var(--f-body);text-anchor:middle;pointer-events:none}
+.portrait,.head{transform-box:fill-box;transform-origin:50% 100%}
+.ex{display:none}
+.s-pensando .ex-pensando,.s-fome .ex-fome,.s-comendo .ex-comendo,.s-dead .ex-dead{display:inline}
+.tdot{fill:var(--panel);stroke:var(--think);stroke-width:1.5}
+.s-pensando .disc{fill:var(--think-soft);stroke:var(--think)} .s-pensando .badge{stroke:var(--think)} .s-pensando .pstate{fill:var(--think)}
+.s-fome .disc{fill:var(--hungry-soft);stroke:var(--hungry)} .s-fome .badge{stroke:var(--hungry)} .s-fome .pstate{fill:var(--hungry)}
+.s-comendo .disc{fill:var(--eat-soft);stroke:var(--eat)} .s-comendo .badge{stroke:var(--eat)} .s-comendo .pstate{fill:var(--eat)}
+.s-dead .disc{fill:var(--dead-soft);stroke:var(--dead)} .s-dead .badge{stroke:var(--dead)} .s-dead .pstate{fill:var(--dead)}
+.bubble{transform-box:fill-box;transform-origin:center}
+.bubble rect,.bubble .tail{fill:var(--panel);stroke:var(--line);stroke-width:2}
+.bubble .patch{stroke:var(--panel);stroke-width:3.5}
+.s-fome .bubble rect,.s-fome .bubble .tail{stroke:var(--hungry)}
+.s-comendo .bubble rect,.s-comendo .bubble .tail{stroke:var(--eat)}
+.s-dead .bubble rect,.s-dead .bubble .tail{stroke:var(--dead);fill:var(--dead-soft)}
+.s-dead .bubble .patch{stroke:var(--dead-soft)}
+.btxt{font:600 15px var(--f-body);fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.no-bubbles .bubble{display:none}
+@keyframes pulse{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.4)}}
+@keyframes chew{from{transform:translateY(0)}to{transform:translateY(1.6px)}}
+@keyframes sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+@keyframes shake{0%,100%{transform:translateX(-1.4px)}50%{transform:translateX(1.4px)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes stamp{from{transform:rotate(-8deg) scale(1.9);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:1}}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion: no-preference){
+  .fork{transition:transform .38s cubic-bezier(.3,.7,.2,1)}
+  .s-fome .pulse{animation:pulse 1.5s ease-out infinite}
+  .s-comendo .head{animation:chew .4s ease-in-out infinite alternate}
+  .s-fome .portrait{animation:sway 1.3s ease-in-out infinite}
+  .s-dead .portrait{animation:shake .22s linear infinite}
+  .s-pensando .tdot{animation:blink 2.2s ease-in-out infinite}
+  .phil.spot .spot-ring{animation:spin 7s linear infinite}
+  .stamp.on{animation:stamp .5s cubic-bezier(.2,1.4,.4,1)}
+  .bubble.pop{animation:pop .25s ease-out}
+}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:.86em;color:var(--muted)}
+.legend li{display:flex;align-items:center;gap:8px}
+.sw{width:16px;height:16px;border-radius:50%;border:3px solid;flex:none}
+.sw.t{background:var(--think-soft);border-color:var(--think)}
+.sw.h{background:var(--hungry-soft);border-color:var(--hungry)}
+.sw.e{background:var(--eat-soft);border-color:var(--eat)}
+.sw.d{background:var(--dead-soft);border-color:var(--dead)}
+
+.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{padding:10px 20px;border:2px solid var(--line);border-radius:12px;background:var(--panel);font-weight:700;cursor:pointer;line-height:1.2}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);min-width:8.2em}
+.btn:disabled{opacity:.5;cursor:default}
+.speed{display:flex;align-items:center;gap:10px;font-weight:600}
+.speed input{width:min(170px,34vw);accent-color:var(--accent)}
+.speed output{font-family:var(--f-mono);min-width:3.2em}
+.check{display:flex;gap:10px;align-items:center;font-weight:600}
+.check input{width:1.2em;height:1.2em;accent-color:var(--accent);flex:none}
+.hint{color:var(--muted);font-size:.86em;flex-basis:100%}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;flex-basis:100%}
+.step{display:grid;gap:2px;text-align:left;padding:8px 12px;border:2px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;min-width:0}
+.step b{font:400 1.1em var(--f-display);color:var(--accent)}
+.step span{font-size:.86em;line-height:1.25;overflow-wrap:anywhere}
+.step:hover{border-color:var(--accent)}
+.step[aria-disabled="true"]{opacity:.55;cursor:default;border-style:dashed}
+.step[aria-disabled="true"]:hover{border-color:var(--line)}
+.clicks{font:700 1em var(--f-mono)}
+
+h3{font-size:.78em;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.block{display:grid;gap:10px;min-width:0}
+.log{display:grid;gap:4px}
+.log li{display:flex;gap:10px;align-items:baseline;min-width:0}
+.log li + li{opacity:.72}
+.log li.empty{color:var(--muted);opacity:1}
+.ltag{flex:none;min-width:6.6em;text-align:center;padding:1px 8px;border-radius:999px;border:2px solid var(--line);font-size:.76em;font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-style:normal}
+.ltag.solicitar{border-color:var(--think);color:var(--think)}
+.ltag.usar{border-color:var(--eat);color:var(--eat);background:var(--eat-soft)}
+.ltag.liberar{border-color:var(--muted);color:var(--muted)}
+.ltag.espera{border-color:var(--hungry);color:var(--hungry);background:var(--hungry-soft)}
+.ltag.desiste{border-color:var(--live);color:var(--live);background:var(--live-soft)}
+.ltag.deadlock{border-color:var(--dead);color:var(--dead);background:var(--dead-soft)}
+.log span{min-width:0}
+
+.coffman{display:grid;border-top:2px solid var(--line)}
+.coffman li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center;padding:9px 12px;border-bottom:2px solid var(--line);transition:background .25s}
+.coffman b{font-weight:700}
+.coffman small{grid-column:1;color:var(--muted);font-size:.86em}
+.coffman li.now{background:var(--hungry-soft)}
+.coffman li.now small{color:var(--ink);font-weight:600}
+.coffman li.now.c3{background:var(--dead-soft)}
+.coffman li.focus{outline:3px solid var(--accent);outline-offset:-3px}
+.lamp{grid-row:1 / span 2;grid-column:2;display:flex;align-items:center;gap:8px;font-size:.78em;font-weight:700;white-space:nowrap;color:var(--muted)}
+.lamp i{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);background:var(--panel)}
+.now .lamp{color:var(--hungry)} .now .lamp i{background:var(--hungry);border-color:var(--hungry);box-shadow:0 0 0 4px var(--hungry-soft)}
+.now.c3 .lamp{color:var(--dead)} .now.c3 .lamp i{background:var(--dead);border-color:var(--dead);box-shadow:0 0 0 4px var(--dead-soft)}
+.off .lamp{color:var(--eat)} .off .lamp i{background:var(--eat-soft);border-color:var(--eat)}
+.nowcount{font-weight:700}
+.nowcount.all{color:var(--dead)}
+.meter{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.meter i{height:10px;border-radius:5px;background:var(--line)}
+.meter i.on{background:var(--hungry)}
+.meter.all i.on{background:var(--dead)}
+
+/* ficha do processo */
+.pcb-head{display:flex;gap:14px;align-items:center}
+#pcb-face{width:84px;height:84px;flex:none}
+.pcb-head b{display:block;font:400 1.35em/1.15 var(--f-display)}
+.pcb-head span{color:var(--muted);font-size:.9em}
+.pcb-dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;font-size:.94em}
+.pcb-dl dt{color:var(--muted);font-weight:600}
+.pcb-dl dd{font-weight:700;min-width:0;overflow-wrap:anywhere}
+.pcb-dl code{font:400 .92em var(--f-mono)}
+.pcb-why{padding:10px 14px;border-radius:12px;background:var(--accent-soft);font-weight:600}
+.pick{display:flex;flex-wrap:wrap;gap:6px}
+.pick button{padding:5px 12px;border:2px solid var(--line);border-radius:999px;background:var(--panel);font-weight:700;font-size:.86em;cursor:pointer}
+.pick button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+#rag{display:block;width:100%;max-width:340px;height:auto;margin-inline:auto}
+.rag-p{stroke-width:2.5}
+.rag-r{fill:var(--panel);stroke:var(--muted);stroke-width:2.5}
+.rag-r.held{stroke:var(--ink)}
+.rag-t{font:700 13px var(--f-mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.rag-a{fill:none;stroke:var(--ink);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.rag-q{fill:none;stroke:var(--hungry);stroke-width:2.4;stroke-dasharray:5 4}
+.rag-hq{fill:none;stroke:var(--hungry);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.rag-ad{fill:none;stroke:var(--dead);stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+.rag-qd{fill:none;stroke:var(--dead);stroke-width:3.2;stroke-dasharray:5 4}
+.rag-legend{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:.84em;color:var(--muted);justify-content:center}
+.rag-legend span{display:inline-flex;align-items:center;gap:8px}
+.lg-a,.lg-q{display:inline-block;width:28px;border-top:3px solid var(--ink)}
+.lg-q{border-top:3px dashed var(--hungry)}
+.why{max-width:62ch}
+.rag-note{font-size:.84em;color:var(--muted);text-align:center}
+.verdict{display:flex;flex-wrap:wrap;gap:8px}
+.verdict span{padding:5px 14px;border-radius:999px;border:2px solid;font-size:.86em;font-weight:700}
+.verdict .bad{background:var(--dead-soft);border-color:var(--dead);color:var(--dead)}
+.verdict .warn{background:var(--hungry-soft);border-color:var(--hungry);color:var(--hungry)}
+.verdict .good{background:var(--eat-soft);border-color:var(--eat);color:var(--eat)}
+
+.strat-name{font:400 1.4em/1.2 var(--f-display);text-wrap:balance}
+.desc{color:var(--muted);max-width:60ch}
+.listing{background:var(--panel);border:2px solid var(--line);border-radius:14px;padding-block:10px;overflow-x:auto;font:400 .88em/1.55 var(--f-mono)}
+.rows{display:inline-block;min-width:100%;vertical-align:top}
+.ln{display:flex;align-items:center;gap:10px;padding-inline:8px 14px}
+.ln .n{width:1.8em;text-align:right;color:var(--muted);opacity:.7;flex:none;font-variant-numeric:tabular-nums}
+.ln code{font:inherit;white-space:pre}
+.ln .c{color:var(--muted)}
+.ln.on{background:var(--accent-soft)}
+.pcs{display:flex;gap:4px;margin-left:auto;padding-left:10px;position:sticky;right:10px;background:var(--accent-soft);border-radius:999px}
+.pcs:empty{display:none}
+.chip{display:inline-grid;place-items:center;width:1.65em;height:1.65em;border-radius:50%;border:2px solid;font:700 .82em/1 var(--f-mono);font-style:normal}
+.chip.s-pensando{background:var(--think-soft);border-color:var(--think)}
+.chip.s-fome{background:var(--hungry-soft);border-color:var(--hungry)}
+.chip.s-comendo{background:var(--eat-soft);border-color:var(--eat)}
+.chip.s-dead{background:var(--dead-soft);border-color:var(--dead)}
+.listing-note{font-size:.86em;color:var(--muted)}
+
+footer{color:var(--muted);font-size:.82em;max-width:90ch}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">Sistemas Operacionais · Aula 6 · Deadlocks</p>
+      <h1>O Jantar dos Filósofos</h1>
+    </div>
+    <p class="lede">Cinco filósofos, cinco hashis (os palitos japoneses), e cada um precisa de dois para comer. Siga a aula guiada passo a passo ou teste as estratégias por conta própria.</p>
+  </header>
+
+  <section class="bar" aria-label="Configuração">
+    <fieldset class="group">
+      <legend>Modo</legend>
+      <div class="pills">
+        <label class="pill"><input type="radio" name="mode" id="mode-guia" value="guia" checked><span>Aula guiada</span></label>
+        <label class="pill"><input type="radio" name="mode" id="mode-auto" value="auto"><span>O sistema escalona</span></label>
+        <label class="pill"><input type="radio" name="mode" id="mode-manual" value="manual"><span>Você escalona</span></label>
+      </div>
+    </fieldset>
+    <fieldset class="group">
+      <legend>Estratégia</legend>
+      <div class="pills" id="strat-pills"></div>
+    </fieldset>
+    <fieldset class="group opts">
+      <legend>Exibir</legend>
+      <div class="pills">
+        <label class="check" for="opt-bubbles"><input type="checkbox" id="opt-bubbles" checked> Falas</label>
+        <label class="check" for="opt-sound"><input type="checkbox" id="opt-sound"> Som</label>
+      </div>
+    </fieldset>
+  </section>
+
+  <div class="main">
+    <section class="stage" aria-label="Mesa">
+      <svg id="mesa" viewBox="-440 -342 880 652" role="img" aria-label="Mesa redonda vista de cima, com cinco filósofos, cinco pratos e cinco hashis"></svg>
+      <ul class="legend" aria-label="Legenda">
+        <li><i class="sw t"></i>pensando</li>
+        <li><i class="sw h"></i>com fome</li>
+        <li><i class="sw e"></i>comendo</li>
+        <li><i class="sw d"></i>travado</li>
+        <li>selo = refeições feitas</li>
+        <li>números na mesa = hashis 0 a 4</li>
+        <li>passe o mouse num filósofo para ver a ficha dele</li>
+      </ul>
+    </section>
+
+    <section class="panel" aria-label="Explicação">
+      <div class="narr" id="narr" aria-live="polite">
+        <div class="narr-top">
+          <span class="narr-step" id="narr-step">Passo 1</span>
+          <span class="narr-slide" id="narr-slide"></span>
+        </div>
+        <h2 id="narr-title"></h2>
+        <p id="narr-text"></p>
+        <div class="quiz" id="quiz" hidden>
+          <p class="quiz-q" id="quiz-q"></p>
+          <div class="quiz-opts" id="quiz-opts"></div>
+          <p class="quiz-why" id="quiz-why" hidden></p>
+        </div>
+        <div class="narr-nav">
+          <button class="btn" id="tour-prev" type="button">Anterior</button>
+          <div class="dots" id="tour-dots" aria-label="Passos da aula"></div>
+          <button class="btn primary" id="tour-next" type="button">Próximo</button>
+        </div>
+        <p class="narr-keys">Setas ← → ou o passador de slides também avançam. Quadradinhos marcam as perguntas.</p>
+      </div>
+
+      <div class="status" id="status" role="status" aria-live="polite" data-kind="ok" hidden>
+        <strong id="status-title">Em andamento</strong>
+        <span id="status-text"></span>
+      </div>
+
+      <div class="controls" id="auto-controls" hidden>
+        <button class="btn primary" id="btn-run" type="button">Pausar</button>
+        <button class="btn" id="btn-reset" type="button">Reiniciar</button>
+        <button class="btn" id="btn-sync" type="button">Todos com fome juntos</button>
+        <label class="speed" for="speed">Velocidade
+          <input type="range" id="speed" min="0.25" max="3" step="0.25" value="1">
+          <output id="speed-out" for="speed">1×</output>
+        </label>
+        <label class="check" for="teach-pause"><input type="checkbox" id="teach-pause" checked> Pausar e explicar quando surgir uma condição de Coffman</label>
+        <p class="hint">Clique num filósofo que está pensando para deixá-lo com fome na hora.</p>
+      </div>
+
+      <div class="controls" id="manual-controls" hidden>
+        <div class="steps" id="steps"></div>
+        <span class="clicks" id="clicks">0 cliques</span>
+        <button class="btn" id="btn-reset-m" type="button">Reiniciar</button>
+        <p class="hint">Cada clique executa o próximo passo do filósofo. Teclas 0 a 4 também funcionam (0 é Sócrates, 4 é Descartes).</p>
+      </div>
+
+      <div class="block" id="log-block" hidden>
+        <h3>O que acabou de acontecer</h3>
+        <ul class="log" id="log"></ul>
+      </div>
+
+      <div class="block">
+        <h3>As 4 condições de Coffman</h3>
+        <div class="meter" id="meter"><i></i><i></i><i></i><i></i></div>
+        <p class="nowcount" id="nowcount"></p>
+        <ul class="coffman" id="coffman"></ul>
+      </div>
+    </section>
+  </div>
+
+  <div class="lower">
+    <section class="block" aria-label="Ficha do processo">
+      <h3>Ficha do processo</h3>
+      <div class="pcb-head">
+        <svg id="pcb-face" viewBox="-48 -48 96 96" aria-hidden="true"></svg>
+        <div><b id="pcb-name"></b><span id="pcb-sub"></span></div>
+      </div>
+      <dl class="pcb-dl" id="pcb-dl"></dl>
+      <p class="pcb-why" id="pcb-why"></p>
+      <div class="pick" id="pcb-pick" aria-label="Escolher processo"></div>
+    </section>
+
+    <section class="block" aria-label="Grafo de alocação de recursos">
+      <h3>Grafo de alocação de recursos</h3>
+      <svg id="rag" viewBox="-148 -148 296 296" role="img" aria-label="Grafo de alocação: filósofos e hashis"></svg>
+      <p class="rag-legend"><span><i class="lg-a"></i>atribuição: hashi → filósofo</span><span><i class="lg-q"></i>requisição: filósofo → hashi</span></p>
+      <p class="rag-note">Círculos são os filósofos (processos) e quadrados os hashis (recursos). Nos slides 18 e 19, os mesmos papéis aparecem como P e R.</p>
+      <p class="why" id="why"></p>
+      <div class="verdict" id="verdict"></div>
+    </section>
+
+    <section class="block" aria-label="Código">
+      <h3>Código da estratégia</h3>
+      <h2 class="strat-name" id="strat-name"></h2>
+      <p class="desc" id="strat-desc"></p>
+      <div class="listing" id="code" aria-label="Código do filósofo i"></div>
+      <p class="listing-note">Código do filósofo <b>i</b>, com N = 5: Sócrates é 0, Platão 1, Aristóteles 2, Hipátia 3 e Descartes 4. As bolinhas com a inicial mostram em que linha cada um está agora.</p>
+      <label class="check" id="rand-wrap" for="rand-backoff" hidden>
+        <input type="checkbox" id="rand-backoff"> T aleatório: cada um espera um tempo diferente
+      </label>
+    </section>
+  </div>
+
+  <footer>Problema proposto por Dijkstra e reformulado por Hoare como o jantar dos filósofos. As quatro condições são as de Coffman (1971). Código no estilo de Tanenbaum, <i>Sistemas Operacionais Modernos</i>. Hashi é o palito japonês. Retratos são ilustrações livres.</footer>
+</div>
+
+<script>
+(() => {
+'use strict';
+const N = 5;
+const PEOPLE = [
+  {name:'Sócrates', skin:'#E8B78C', hair:'#B8BDC5', beard:'#D5D9DF', toga:'#F2EADA', sash:'#9C7A45', style:'socrates'},
+  {name:'Platão', skin:'#E0AE86', hair:'#8B7867', beard:'#9C8A78', toga:'#C8D6EE', sash:'#3E5F8F', style:'platao'},
+  {name:'Aristóteles', skin:'#D7A079', hair:'#4A3527', beard:'#5A4334', toga:'#E6D0A2', sash:'#8A5A2B', style:'aristoteles'},
+  {name:'Hipátia', skin:'#C88C66', hair:'#2E2220', toga:'#D9C3E6', sash:'#7A3FA0', style:'hipatia'},
+  {name:'Descartes', skin:'#EFC6A0', hair:'#3A291F', toga:'#2E3A50', sash:'#F7F4EC', style:'descartes'}
+];
+const NAMES = PEOPLE.map(p => p.name);
+const DE = ['do Sócrates', 'do Platão', 'do Aristóteles', 'da Hipátia', 'do Descartes'];
+const PARA = ['a Sócrates', 'a Platão', 'a Aristóteles', 'à Hipátia', 'a Descartes'];
+const INI = ['S', 'P', 'A', 'H', 'D'];
+const nm = i => NAMES[i];
+const oH = arr => arr.length === 1 ? 'o hashi ' + arr[0] : 'os hashis ' + arr.join(' e ');
+const THOUGHTS = [
+  [['Só sei que', 'nada sei.'], ['O que é', 'a justiça?']],
+  [['E se isto for', 'só uma sombra?'], ['No mundo das', 'ideias tem pão?']],
+  [['Primeiro a lógica,', 'depois a massa.'], ['Todo homem tem', 'fome. Logo…']],
+  [['Quantos hashis', 'numa elipse?'], ['Cônicas,', 'parábolas…']],
+  [['Penso,', 'logo existo.'], ['Duvido,', 'logo penso.']]
+];
+const L = i => i, R = i => (i + 1) % N;
+const LO = i => Math.min(L(i), R(i)), HI = i => Math.max(L(i), R(i));
+const REACH = 0.7;
+
+const COFFMAN = [
+  ['Exclusão mútua', 'Só um processo usa o recurso por vez.'],
+  ['Retenção e espera', 'Segura o que tem enquanto espera mais.'],
+  ['Sem preempção', 'O recurso não é retirado à força.'],
+  ['Espera circular', 'Uma cadeia fechada: cada um espera o próximo.']
+];
+
+const STRATS = {
+  ingenua: {
+    pill: 'Ingênua', titulo: 'Versão 1: pegar o esquerdo, depois o direito',
+    desc: 'Cada filósofo pega o hashi da esquerda e depois o da direita. É a versão sujeita a deadlock: roda bem por um tempo, até não rodar mais.',
+    obs: 'Funciona até os cinco pegarem o hashi esquerdo antes de alguém pegar o direito. Espere acontecer ou use “Todos com fome juntos”.',
+    missao: 'Trave o jantar com apenas 5 cliques.',
+    quebra: -1, porque: 'Nenhuma condição foi quebrada. As quatro podem aparecer ao mesmo tempo, então o deadlock pode acontecer.',
+    dead: true, live: false,
+    codigo: [
+      'while (true) {',
+      '  pensar();',
+      '  pegar(hashi[i]);            // esquerdo',
+      '  pegar(hashi[(i+1) % N]);    // direito',
+      '  comer();',
+      '  soltar(hashi[i]);',
+      '  soltar(hashi[(i+1) % N]);',
+      '}'],
+    ops: [{k:'think',line:1},{k:'take',f:L,line:2},{k:'take',f:R,line:3},{k:'eat',line:4},{k:'put',line:5}]
+  },
+  desiste: {
+    pill: 'Solta e repete', titulo: 'Soltar antes de pedir de novo',
+    desc: 'Se o hashi da direita estiver ocupado, o filósofo solta o da esquerda, espera um tempo T e recomeça.',
+    obs: 'Não há deadlock. Mas use “Todos com fome juntos” com T fixo: todos pegam e soltam no mesmo ritmo e ninguém come.',
+    missao: 'Faça os cinco pegarem o hashi esquerdo e depois tentarem o direito. Alguém consegue comer?',
+    quebra: 1, porque: 'Quebra a retenção e espera: quem não consegue o segundo hashi solta o primeiro. Ninguém espera segurando recurso. O preço é o risco de livelock.',
+    dead: false, live: true, retry: 1,
+    codigo: [
+      'while (true) {',
+      '  pensar();',
+      '  while (true) {',
+      '    pegar(hashi[i]);',
+      '    if (tentar(hashi[(i+1) % N])) break;',
+      '    soltar(hashi[i]);       // desiste',
+      '    esperar(T);',
+      '  }',
+      '  comer();',
+      '  soltar(hashi[i]);',
+      '  soltar(hashi[(i+1) % N]);',
+      '}'],
+    ops: [{k:'think',line:1},{k:'take',f:L,line:3},{k:'try',f:R,line:4,ok:5},{k:'putback',line:5},{k:'backoff',line:6,to:1},{k:'eat',line:8},{k:'put',line:9}]
+  },
+  hierarquia: {
+    pill: 'Ordem crescente', titulo: 'Hashis numerados, pedidos em ordem crescente',
+    desc: 'Os hashis são numerados e todos pedem primeiro o de menor número. Só Descartes muda de comportamento: ele pede o hashi 0 antes do hashi 4.',
+    obs: 'Tente “Todos com fome juntos”: Descartes disputa o hashi 0 com Sócrates em vez de pegar o hashi 4. Assim o 4 fica livre para Hipátia e o ciclo não fecha.',
+    missao: 'Tente travar o jantar como na versão 1. Observe o que Descartes faz de diferente.',
+    quebra: 3, porque: 'Quebra a espera circular: com uma ordem global, alguém sempre disputa o recurso de menor número em vez de fechar o ciclo.',
+    dead: false, live: false,
+    codigo: [
+      'while (true) {',
+      '  pensar();',
+      '  a = min(i, (i+1) % N);',
+      '  b = max(i, (i+1) % N);',
+      '  pegar(hashi[a]);     // menor número',
+      '  pegar(hashi[b]);',
+      '  comer();',
+      '  soltar(hashi[b]);',
+      '  soltar(hashi[a]);',
+      '}'],
+    ops: [{k:'think',line:1},{k:'take',f:LO,line:4},{k:'take',f:HI,line:5},{k:'eat',line:6},{k:'put',line:7}]
+  },
+  garcom: {
+    pill: 'No máximo 4', titulo: 'No máximo 4 filósofos à mesa',
+    desc: 'Um semáforo com N − 1 lugares deixa no máximo quatro filósofos tentarem pegar hashis ao mesmo tempo.',
+    obs: 'Com quatro à mesa e cinco hashis, pelo menos um filósofo consegue os dois. O quinto espera um lugar.',
+    missao: 'Tente fazer os cinco pegarem o hashi esquerdo. O que acontece com o quinto?',
+    quebra: 3, porque: 'Quebra a espera circular: com no máximo quatro disputando cinco hashis, sempre sobra um e o ciclo não fecha.',
+    dead: false, live: false,
+    codigo: [
+      'semaforo sala = N - 1;   // 4 lugares',
+      'while (true) {',
+      '  pensar();',
+      '  down(sala);            // pede lugar',
+      '  pegar(hashi[i]);',
+      '  pegar(hashi[(i+1) % N]);',
+      '  comer();',
+      '  soltar(hashi[i]);',
+      '  soltar(hashi[(i+1) % N]);',
+      '  up(sala);              // libera o lugar',
+      '}'],
+    ops: [{k:'think',line:2},{k:'sit',line:3},{k:'take',f:L,line:4},{k:'take',f:R,line:5},{k:'eat',line:6},{k:'put',line:7},{k:'leave',line:9}]
+  },
+  monitor: {
+    pill: 'Os dois ou nenhum', titulo: 'Pedir os dois hashis de uma vez',
+    desc: 'O filósofo só começa a comer se nenhum vizinho estiver comendo, e pega os dois hashis de uma vez, dentro de uma seção crítica. É a solução com estados de Tanenbaum.',
+    obs: 'Ninguém segura um hashi só, então não há deadlock. Mas dois vizinhos podem se revezar e deixar o do meio com fome.',
+    missao: 'Deixe Sócrates com fome enquanto Platão e Descartes se revezam comendo. Quantas vezes você consegue passar na frente dele?',
+    quebra: 1, porque: 'Quebra a retenção e espera: os dois hashis são pegos de uma vez, ou nenhum. Ninguém espera segurando recurso.',
+    dead: false, live: false,
+    codigo: [
+      'while (true) {',
+      '  pensar();',
+      '  pegar_hashis(i);     // os dois ou nenhum',
+      '  comer();',
+      '  soltar_hashis(i);    // acorda vizinhos',
+      '}',
+      '',
+      'pegar_hashis(i):       // seção crítica',
+      '  estado[i] = FAMINTO;',
+      '  se nenhum vizinho está COMENDO:',
+      '    estado[i] = COMENDO;',
+      '  senão: dorme até ser acordado;'],
+    ops: [{k:'think',line:1},{k:'both',line:2,blockLine:11},{k:'eat',line:3},{k:'put',line:4}]
+  }
+};
+const ACQ = {take:1, try:1, sit:1, both:1};
+
+/* ---------- roteiro da aula guiada ---------- */
+const FATAL = [0, 1, 2, 3, 4];
+const TOUR = [
+  {strat:'ingenua', do:[], slide:'Slides 7 e 9', focus:[], spot:[],
+   title:'Cinco filósofos, cinco hashis',
+   text:'Cada filósofo é um processo (ou uma thread). Cada hashi, o palito japonês, é um recurso compartilhado. Para comer, ou seja, executar sua tarefa, o filósofo precisa dos dois hashis ao seu lado. Todos começam pensando, sem segurar nada.'},
+  {strat:'ingenua', do:[0], slide:'Slides 6 e 13', focus:[0], spot:[0],
+   title:'Solicitar: Sócrates pede o hashi 0',
+   text:'Sócrates ficou com fome e pediu o hashi 0. Como ele estava livre, o sistema entregou o hashi a Sócrates. Agora só ele pode usar o hashi 0: isso é exclusão mútua, a 1ª condição de Coffman. No grafo, a seta do hashi para Sócrates é uma atribuição.'},
+  {strat:'ingenua', do:[0, 0], slide:'Slide 6', focus:[0], spot:[0],
+   title:'Usar: Sócrates come',
+   text:'Sócrates também conseguiu o hashi 1 e começou a comer. Esta é a fase de uso, a seção crítica. Os vizinhos, Platão e Descartes, não conseguem comer agora: cada um precisa de um hashi que está com Sócrates.'},
+  {strat:'ingenua', do:[0, 0, 0], slide:'Slide 6', focus:[], spot:[0],
+   title:'Liberar: Sócrates solta os hashis',
+   text:'Sócrates terminou e soltou os hashis 0 e 1. Todo recurso segue o ciclo solicitar, usar, liberar. O deadlock nasce na fase de solicitar, quando alguém pede algo que outro segura e não solta.'},
+  {strat:'ingenua', do:[0], slide:'Slide 7', focus:[0], spot:[0],
+   title:'O cenário fatal começa',
+   text:'Agora vamos reproduzir o cenário do slide: todos pegam o hashi da esquerda. Sócrates pega o hashi 0 e vai buscar o hashi 1, o da direita.'},
+  {strat:'ingenua', do:[0, 1], slide:'Slides 14 e 18', focus:[1], spot:[0, 1],
+   title:'Retenção e espera',
+   text:'Platão pegou o hashi 1 antes de Sócrates. Agora Sócrates segura o hashi 0 e espera o hashi 1, que está com Platão. Segurar um recurso enquanto espera outro é a 2ª condição de Coffman. No grafo, a seta tracejada de Sócrates para o hashi 1 é uma requisição.'},
+  {strat:'ingenua', do:[0, 1, 2, 3], slide:'Slide 14', focus:[1], spot:[4],
+   title:'A cadeia de espera cresce',
+   text:'Aristóteles e Hipátia fizeram o mesmo. Sócrates espera Platão, Platão espera Aristóteles e Aristóteles espera Hipátia. Ainda não é deadlock: o hashi 4 está livre. Agora tudo depende do que Descartes fizer.',
+   quiz:{q:'Se Descartes pegar o hashi 4 agora, o que acontece?', opts:['Hipátia consegue comer','O ciclo fecha: deadlock','Sócrates consegue o hashi 1'], ok:1,
+         why:'Descartes vai segurar o hashi 4 e pedir o hashi 0, que está com Sócrates. Todos passam a segurar um hashi e esperar o do vizinho.'}},
+  {strat:'ingenua', do:[0, 1, 2, 3], slide:'Slides 5 e 15', focus:[2], spot:[0, 1],
+   title:'Sem preempção',
+   text:'Por que Sócrates não toma o hashi 1 da mão de Platão? Porque o hashi é um recurso não preemptável: arrancá-lo no meio do uso é como tirar um arquivo de quem está escrevendo nele. Cada um só solta quando quiser. Essa é a 3ª condição.',
+   quiz:{q:'Se o SO arrancasse o hashi 1 de Platão para dar a Sócrates, qual condição deixaria de valer?', opts:['Exclusão mútua','Retenção e espera','Sem preempção','Espera circular'], ok:2,
+         why:'Tirar um recurso à força é preempção. Funciona com a CPU, mas com um hashi (mutex, arquivo em escrita) pode deixar dados inconsistentes.'}},
+  {strat:'ingenua', do:FATAL, slide:'Slides 16 e 19', focus:[3], spot:[4],
+   title:'Espera circular: deadlock!',
+   text:'Descartes pegou o hashi 4, o último livre, e agora espera o hashi 0, que está com Sócrates. O ciclo fechou: Sócrates → Platão → Aristóteles → Hipátia → Descartes → Sócrates. As quatro condições aparecem ao mesmo tempo. Ninguém come e ninguém solta.'},
+  {strat:'ingenua', do:FATAL, slide:'Slide 20', focus:[], spot:[],
+   title:'Detecção: reduzindo o grafo',
+   text:'Como o SO descobre isso? Reduzindo o grafo: procura um processo que consiga terminar, simula a conclusão e libera os recursos dele. Depois repete.',
+   quiz:{q:'Neste grafo, quantos filósofos conseguimos remover?', opts:['Todos os cinco','Só Descartes','Nenhum'], ok:2,
+         why:'Cada um espera um hashi que outro segura. Ninguém termina, então ninguém solta nada. Sobram os cinco: estão em deadlock.'}},
+  {strat:'ingenua', do:FATAL.concat(['rb4']), slide:'Slide 21', focus:[], spot:[4],
+   title:'Recuperação: rollback de Descartes',
+   text:'Para sair do impasse, o SO precisa agir. Aqui Descartes sofre rollback: volta a pensar e solta o hashi 4. Ele perde o trabalho que tinha feito, e esse é o custo da recuperação. O hashi 4 ficou livre.'},
+  {strat:'ingenua', do:FATAL.concat(['rb4', 3]), slide:'Slide 21', focus:[], spot:[3],
+   title:'A cadeia se desfaz',
+   text:'Hipátia pega o hashi 4 e come. Quando terminar, solta os hashis 3 e 4, então Aristóteles poderá comer, depois Platão, e assim por diante. Recuperar funciona, mas sempre custa algo. Por isso muitas vezes é melhor prevenir.'},
+  {strat:'hierarquia', do:FATAL, slide:'Slides 16 e 27', focus:[3], spot:[4],
+   title:'Prevenir: pedir em ordem crescente',
+   text:'Os mesmos cinco cliques, agora com os hashis pedidos em ordem crescente de número. Repare em Descartes: em vez de pegar o hashi 4, ele pede primeiro o hashi 0 e espera sem segurar nada.',
+   quiz:{q:'Por que Descartes não fecha o ciclo desta vez?', opts:['Ele pede o hashi 0 antes do 4','Ele tem prioridade maior','O SO tirou o hashi dele'], ok:0,
+         why:'Pedindo em ordem crescente, Descartes disputa o hashi 0 com Sócrates sem segurar nada. O hashi 4 sobra para Hipátia.'}},
+  {strat:'hierarquia', do:FATAL.concat([3]), slide:'Slides 16 e 27', focus:[3], spot:[3],
+   title:'O ciclo não fecha',
+   text:'Hipátia pega o hashi 4 e come. A espera circular foi quebrada pela ordenação dos recursos. É a regra prática mais usada em programas com vários mutexes: todos travam na mesma ordem.'},
+  {strat:'garcom', do:FATAL.concat([3]), slide:'Slide 17', focus:[3], spot:[4, 3],
+   title:'Prevenir: no máximo quatro à mesa',
+   text:'Um semáforo com quatro lugares deixa só quatro filósofos tentarem pegar hashis. Descartes espera um lugar sem segurar nada. Com quatro disputando cinco hashis, sempre sobra um, e Hipátia come.'},
+  {strat:'monitor', do:FATAL, slide:'Slide 14', focus:[1], spot:[0, 2],
+   title:'Prevenir: pedir tudo de uma vez',
+   text:'Aqui o filósofo pega os dois hashis de uma vez, ou nenhum. Sócrates e Aristóteles comem. Platão, Hipátia e Descartes esperam sem segurar nada. Sem retenção e espera não há deadlock. O custo é menos paralelismo.'},
+  {strat:'desiste', live:true, slide:'Slide 14', focus:[1], spot:[],
+   title:'Soltar antes de pedir: cuidado com o livelock',
+   text:'Outra forma de quebrar a retenção e espera: se o segundo hashi está ocupado, soltar o primeiro e tentar de novo depois de um tempo T. Se todos agem no mesmo ritmo, pegam e soltam sem parar. Há atividade, mas ninguém come: isso é livelock.'},
+  {strat:'ingenua', do:FATAL, slide:'Slide 29', focus:[], spot:[],
+   title:'Exercício: cenário A',
+   text:'Saindo da mesa para um sistema real. O processo P1 segura o arquivo log.txt e quer o banco de dados. O processo P2 segura o banco e quer o log.txt.',
+   quiz:{q:'Há deadlock entre P1 e P2?', opts:['Sim, entre P1 e P2','Não, são só dois processos','Só se houver um terceiro'], ok:0,
+         why:'É o mesmo ciclo da mesa, com dois processos: P1 → banco → P2 → log.txt → P1. Bastam dois para fechar o ciclo.'}},
+  {strat:'hierarquia', do:FATAL.concat([3]), slide:'Slide 29', focus:[3], spot:[],
+   title:'Exercício: cenário C',
+   text:'Dois processos sempre pedem os recursos em ordem crescente: primeiro o recurso 1, depois o 2, depois o 3. É a mesma regra que salvou o jantar.',
+   quiz:{q:'É possível fechar uma espera circular?', opts:['Sim','Não'], ok:1,
+         why:'Não. Para fechar o ciclo, alguém teria que segurar um recurso maior e pedir um menor, o que a regra proíbe.'}},
+  {strat:'ingenua', do:[], slide:'Slides 28 e 30', focus:[], spot:[],
+   title:'Agora é com vocês',
+   text:'Escolha uma estratégia e passe para “Você escalona” para controlar os filósofos, ou “O sistema escalona” para ver a simulação rodar sozinha. Pergunta final: num programa com vários mutexes, qual regra prática você adotaria?'}
+];
+
+/* ---------- estado ---------- */
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+let stratKey = 'ingenua', strat = STRATS.ingenua, mode = 'guia', running = false, speed = 1, randBackoff = false;
+let tourIdx = 0, muted = false, sel = 0;
+let S;
+const LOG = []; let logVer = 0;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const cur = p => strat.ops[p.pc];
+const heldBy = p => { const h = []; for (let f = 0; f < N; f++) if (S.forks[f] === p.i) h.push(f); return h; };
+const $ = id => document.getElementById(id);
+
+/* som */
+let AC = null, lastSfx = 0;
+const SFX = {solicitar:['triangle',880,920,.06], liberar:['triangle',520,400,.08], usar:['sine',660,990,.16], espera:['square',210,190,.08], desiste:['triangle',600,300,.12], deadlock:['sawtooth',320,70,.7]};
+function sfx(kind) {
+  if (!$('opt-sound').checked || !SFX[kind]) return;
+  const nowMs = performance.now();
+  if (kind !== 'deadlock' && nowMs - lastSfx < 70) return;
+  lastSfx = nowMs;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    const [type, f0, f1, d] = SFX[kind], t = AC.currentTime;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + d);
+    g.gain.setValueAtTime(.12, t); g.gain.exponentialRampToValueAtTime(.001, t + d + .05);
+    o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + d + .06);
+  } catch (e) { /* sem áudio */ }
+}
+
+function log(tag, text) {
+  if (muted) return;
+  LOG.unshift({tag, text});
+  if (LOG.length > 6) LOG.pop();
+  logVer++;
+  sfx(tag);
+}
+
+function reset(sync) {
+  S = {ph: [], forks: Array(N).fill(null), sala: N - 1, clock: 0, clicks: 0, failsSinceMeal: 0, total: 0,
+       deadlock: null, loggedDead: false, seen: [false, false, false, false], teach: null};
+  for (let i = 0; i < N; i++) {
+    S.ph.push({i, pc: 0, t: sync ? 0.9 : rnd(0.5, 3), status: 'pensando', meals: 0, since: 0, over: 0, blockedOn: null, eatDur: 1});
+  }
+  LOG.length = 0; logVer++;
+}
+
+function releaseAll(p) { for (let f = 0; f < N; f++) if (S.forks[f] === p.i) S.forks[f] = null; }
+function putDown(p) {
+  const h = heldBy(p);
+  releaseAll(p);
+  if (h.length) log('liberar', nm(p.i) + ' soltou ' + oH(h) + '.');
+}
+
+function enter(p) {
+  const op = cur(p);
+  p.blockedOn = null;
+  switch (op.k) {
+    case 'think': p.status = 'pensando'; p.t = rnd(1, 3.5); break;
+    case 'take': case 'try': case 'sit': case 'both':
+      if (p.status === 'pensando') { p.status = 'fome'; p.since = S.clock; p.over = 0; }
+      p.t = REACH; break;
+    case 'eat':
+      p.status = 'comendo'; p.t = p.eatDur = rnd(1.2, 2.8); p.meals++; p.over = 0; S.total++; S.failsSinceMeal = 0;
+      [(p.i + 1) % N, (p.i + N - 1) % N].forEach(q => { if (S.ph[q].status === 'fome') S.ph[q].over++; });
+      log('usar', nm(p.i) + ' começou a comer com ' + oH(heldBy(p)) + '.');
+      break;
+    case 'putback': p.t = 0.35; break;
+    case 'backoff': p.t = randBackoff ? rnd(0.15, 1.7) : 0.8; break;
+    default: p.t = 0;
+  }
+}
+function go(p, idx) { p.pc = idx % strat.ops.length; enter(p); }
+
+function attempt(p) {
+  const op = cur(p), i = p.i, was = p.blockedOn;
+  if (op.k === 'take') {
+    const f = op.f(i);
+    if (S.forks[f] === null) { S.forks[f] = i; log('solicitar', nm(i) + ' pediu o hashi ' + f + ': estava livre e ficou com ele.'); go(p, p.pc + 1); return true; }
+    if (!was) {
+      const h = heldBy(p);
+      log('espera', nm(i) + ' pediu o hashi ' + f + ', que está com ' + nm(S.forks[f]) + '. ' + (h.length ? 'Fica esperando com ' + oH(h) + ' na mão.' : 'Fica esperando sem segurar nada.'));
+    }
+    p.blockedOn = {fork: f}; return false;
+  }
+  if (op.k === 'try') {
+    const f = op.f(i);
+    if (S.forks[f] === null) { S.forks[f] = i; log('solicitar', nm(i) + ' tentou o hashi ' + f + ' e conseguiu.'); go(p, op.ok); return true; }
+    S.failsSinceMeal++;
+    log('desiste', nm(i) + ' tentou o hashi ' + f + ', mas estava ocupado. Desiste e solta o hashi ' + L(i) + '.');
+    go(p, p.pc + 1); return false;
+  }
+  if (op.k === 'sit') {
+    if (S.sala > 0) { S.sala--; log('solicitar', nm(i) + ' ganhou um lugar à mesa (sobram ' + S.sala + ').'); go(p, p.pc + 1); return true; }
+    if (!was) log('espera', nm(i) + ' quer um lugar, mas os quatro estão ocupados.');
+    p.blockedOn = {sala: true}; return false;
+  }
+  if (op.k === 'both') {
+    if (S.forks[L(i)] === null && S.forks[R(i)] === null) {
+      S.forks[L(i)] = i; S.forks[R(i)] = i;
+      log('solicitar', nm(i) + ' pegou os hashis ' + L(i) + ' e ' + R(i) + ' de uma vez.');
+      go(p, p.pc + 1); return true;
+    }
+    if (!was) log('espera', nm(i) + ' quer os hashis ' + L(i) + ' e ' + R(i) + ', mas um vizinho está comendo. Espera sem segurar nada.');
+    p.blockedOn = {both: true}; return false;
+  }
+  return false;
+}
+
+function instant(p) {
+  let g = 0;
+  while (g++ < 4) {
+    const op = cur(p);
+    if (op.k === 'put') { putDown(p); go(p, p.pc + 1); }
+    else if (op.k === 'leave') { S.sala++; go(p, p.pc + 1); }
+    else break;
+  }
+}
+
+function tick(dt) {
+  S.clock += dt;
+  const order = [0, 1, 2, 3, 4];
+  for (let k = N - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [order[k], order[j]] = [order[j], order[k]]; }
+  for (const i of order) {
+    const p = S.ph[i];
+    p.t -= dt;
+    let g = 0;
+    while (p.t <= 0 && g++ < 8) {
+      const op = cur(p);
+      if (op.k === 'think') go(p, p.pc + 1);
+      else if (ACQ[op.k]) { if (!attempt(p)) break; }
+      else if (op.k === 'eat') go(p, p.pc + 1);
+      else if (op.k === 'put') { putDown(p); go(p, p.pc + 1); }
+      else if (op.k === 'putback') { releaseAll(p); go(p, p.pc + 1); }
+      else if (op.k === 'leave') { S.sala++; go(p, p.pc + 1); }
+      else if (op.k === 'backoff') go(p, op.to);
+    }
+  }
+}
+
+function waitsFor(p) {
+  const op = cur(p);
+  if (op.k !== 'take') return null;
+  const f = op.f(p.i), h = S.forks[f];
+  return (h !== null && h !== p.i) ? {f, h} : null;
+}
+function detect() {
+  for (let s = 0; s < N; s++) {
+    let c = s; const seen = [];
+    for (let k = 0; k <= N; k++) {
+      const w = waitsFor(S.ph[c]);
+      if (!w) break;
+      seen.push(c); c = w.h;
+      if (c === s) return seen;
+    }
+  }
+  return null;
+}
+const cycleText = c => c.map(nm).join(' → ') + ' → ' + nm(c[0]);
+function checkDead() {
+  if (S.deadlock && !S.loggedDead) { S.loggedDead = true; log('deadlock', 'Espera circular fechada: ' + cycleText(S.deadlock) + '. Ninguém avança.'); }
+}
+const isLivelock = () => stratKey === 'desiste' && S.failsSinceMeal >= (mode === 'manual' ? 5 : 10);
+
+function liveConds() {
+  const out = [null, null, null, null];
+  for (let f = 0; f < N; f++) if (S.forks[f] !== null) { out[0] = 'o hashi ' + f + ' está só com ' + nm(S.forks[f]) + '.'; break; }
+  for (const p of S.ph) {
+    const w = waitsFor(p); if (!w) continue;
+    const h = heldBy(p);
+    if (h.length && !out[1]) out[1] = nm(p.i) + ' segura ' + oH(h) + ' e espera o hashi ' + w.f + '.';
+    if (!out[2]) out[2] = 'ninguém tira o hashi ' + w.f + ' de ' + nm(w.h) + ' para dar ' + PARA[p.i] + '.';
+  }
+  if (S.deadlock) out[3] = cycleText(S.deadlock) + '.';
+  return out;
+}
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const TEACH = [
+  ex => cap(ex) + ' Enquanto não soltar, ninguém mais usa esse hashi.',
+  ex => ex + ' Segura o que tem enquanto espera o resto.',
+  ex => 'Repare: ' + ex + ' Só resta esperar.'
+];
+function teachCheck() {
+  const lc = liveConds(), fresh = [];
+  lc.forEach((v, k) => { if (v && !S.seen[k]) { S.seen[k] = true; if (k < 3) fresh.push(k); } });
+  if (fresh.length && $('teach-pause').checked && !S.deadlock) {
+    running = false;
+    S.teach = {title: 'Surgiu: ' + fresh.map(k => COFFMAN[k][0].toLowerCase()).join(' e '), text: fresh.map(k => TEACH[k](lc[k])).join(' ') + ' Clique em Continuar.'};
+  }
+}
+
+/* ---------- passos manuais ---------- */
+function blockedNow(p) {
+  const op = cur(p), i = p.i;
+  if (op.k === 'take') return S.forks[op.f(i)] !== null;
+  if (op.k === 'sit') return S.sala <= 0;
+  if (op.k === 'both') return S.forks[L(i)] !== null || S.forks[R(i)] !== null;
+  return false;
+}
+function acquire(p) {
+  const op = cur(p);
+  if (op.k === 'sit') { if (attempt(p)) acquire(p); return; }
+  if (op.k === 'try') { if (!attempt(p)) { releaseAll(p); go(p, strat.retry); } return; }
+  attempt(p);
+}
+function doStep(i) {
+  if (S.deadlock) return false;
+  const p = S.ph[i], op = cur(p);
+  if (op.k === 'eat') { go(p, p.pc + 1); instant(p); }
+  else {
+    if (op.k === 'think') go(p, p.pc + 1);
+    else if (blockedNow(p)) return false;
+    acquire(p);
+  }
+  S.clock++;
+  S.deadlock = detect(); checkDead();
+  return true;
+}
+function rollback(i) { const p = S.ph[i]; putDown(p); p.pc = 0; enter(p); S.deadlock = detect(); }
+function manualStep(i) { sel = i; if (mode === 'manual' && doStep(i)) S.clicks++; }
+function nextLabel(p) {
+  const op = cur(p), i = p.i;
+  if (op.k === 'eat') return {t: 'terminar e soltar', dis: false};
+  const think = op.k === 'think';
+  const o = think ? strat.ops[p.pc + 1] : op;
+  let ok = true, t = '';
+  if (o.k === 'take') { const f = o.f(i); ok = S.forks[f] === null; t = ok ? 'pegar o hashi ' + f : (think ? 'ficar com fome' : 'espera o hashi ' + f); }
+  else if (o.k === 'try') { t = 'tentar o hashi ' + o.f(i); }
+  else if (o.k === 'sit') { ok = S.sala > 0; t = ok ? 'sentar e pegar o hashi ' + L(i) : (think ? 'ficar com fome' : 'espera lugar'); }
+  else if (o.k === 'both') { ok = S.forks[L(i)] === null && S.forks[R(i)] === null; t = ok ? 'pegar os hashis ' + L(i) + ' e ' + R(i) : (think ? 'ficar com fome' : 'espera os vizinhos'); }
+  return {t, dis: !ok && !think};
+}
+
+/* ---------- textos por filósofo ---------- */
+function nextWanted(p) {
+  const op = cur(p), o = op.k === 'think' ? strat.ops[p.pc + 1] : op;
+  if (o.k === 'take' || o.k === 'try') return o.f(p.i);
+  if (o.k === 'sit') return L(p.i);
+  return null;
+}
+function bubbleLines(p, dead) {
+  const op = cur(p), w = waitsFor(p), h = heldBy(p);
+  if (dead && w) return [nm(w.h) + ',', 'solta o hashi ' + w.f + '!', 'Não solto o ' + h.join(' e o ') + '.'];
+  if (p.status === 'pensando') return THOUGHTS[p.i][p.meals % 2];
+  if (p.status === 'comendo') return ['Nham! Comendo', 'com os hashis', h.join(' e ') + '.'];
+  if (w) return h.length ? ['Seguro o hashi ' + h.join(' e '), 'e espero o ' + w.f, DE[w.h] + '.'] : ['Espero o hashi ' + w.f, DE[w.h] + ',', 'sem segurar nada.'];
+  if (op.k === 'sit' && S.sala <= 0) return ['Sala cheia.', 'Espero um lugar.'];
+  if (op.k === 'both' && p.blockedOn) return ['Um vizinho está', 'comendo. Espero', 'os dois hashis.'];
+  if (op.k === 'backoff' || op.k === 'putback') return ['O hashi ' + R(p.i) + ' está', 'ocupado. Solto', 'e tento depois.'];
+  if (op.k === 'both') return ['Que fome! Quero', 'os hashis', L(p.i) + ' e ' + R(p.i) + '.'];
+  const f = nextWanted(p);
+  return h.length ? ['Já tenho o ' + h.join(' e o ') + '.', 'Agora quero', 'o hashi ' + f + '!'] : ['Que fome!', 'Vou pegar', 'o hashi ' + f + '.'];
+}
+function stateText(p, dead) {
+  if (p.status === 'pensando') return 'pensando';
+  if (p.status === 'comendo') return 'comendo';
+  const op = cur(p), w = waitsFor(p);
+  let t;
+  if (w) t = (dead ? 'deadlock! quer o hashi ' : 'espera o hashi ') + w.f;
+  else if (op.k === 'sit' && S.sala <= 0) t = 'espera lugar';
+  else if (op.k === 'both' && p.blockedOn) t = 'espera os vizinhos';
+  else if (op.k === 'backoff' || op.k === 'putback') t = 'desistiu';
+  else t = 'com fome';
+  if (mode === 'auto' && !dead) { const s = Math.floor(S.clock - p.since); if (s >= 3) t += ' · ' + s + ' s'; }
+  return t;
+}
+function pcbInfo(p, dead) {
+  const op = cur(p), w = waitsFor(p), h = heldBy(p), i = p.i;
+  let estado, pede = '—', why;
+  if (dead) { estado = 'Bloqueado em deadlock'; pede = 'hashi ' + w.f + ', que está com ' + nm(w.h);
+    why = 'Segura ' + oH(h) + ' e espera o hashi ' + w.f + '. ' + nm(w.h) + ' também espera alguém do mesmo ciclo. Sem intervenção externa, ninguém sai daqui.'; }
+  else if (p.status === 'pensando') { estado = 'Executando, sem recursos'; why = 'Está pensando: não usa nenhum hashi e não disputa nada.'; }
+  else if (p.status === 'comendo') { estado = 'Na seção crítica'; why = 'Tem os dois hashis e está comendo. Quando terminar, solta ' + oH(h) + ' para os vizinhos.'; }
+  else if (w) { estado = 'Bloqueado'; pede = 'hashi ' + w.f + ', que está com ' + nm(w.h);
+    why = h.length ? 'Segura ' + oH(h) + ' enquanto espera o hashi ' + w.f + ': é a retenção e espera acontecendo.' : 'Espera o hashi ' + w.f + ' sem segurar nada. Assim não ajuda a fechar um ciclo.'; }
+  else if (op.k === 'sit' && S.sala <= 0) { estado = 'Bloqueado no semáforo'; pede = 'um lugar na sala'; why = 'Espera uma vaga no semáforo. Não segura nenhum hashi.'; }
+  else if (op.k === 'both' && p.blockedOn) { estado = 'Bloqueado'; pede = 'hashis ' + L(i) + ' e ' + R(i) + ' juntos'; why = 'Espera os dois hashis ficarem livres ao mesmo tempo. Não segura nenhum.'; }
+  else if (op.k === 'backoff' || op.k === 'putback') { estado = 'Esperando o tempo T'; why = 'Desistiu e soltou o hashi. Vai tentar de novo depois de T.'; }
+  else { estado = 'Pedindo recurso'; const f = nextWanted(p); if (f != null) pede = 'hashi ' + f; why = 'Está com fome e vai pedir ' + (f != null ? 'o hashi ' + f : 'os hashis') + '.'; }
+  const line = (op.blockLine != null && p.blockedOn) ? op.blockLine : op.line;
+  return {estado, segura: h.length ? (h.length === 1 ? 'hashi ' + h[0] : 'hashis ' + h.join(' e ')) : 'nada', pede, linha: (line + 1) + ': ' + strat.codigo[line].trim(), why};
+}
+
+/* ---------- desenho ---------- */
+const NS = 'http://www.w3.org/2000/svg';
+const svg = $('mesa'), rag = $('rag');
+function el(name, attrs, parent, text) {
+  const e = document.createElementNS(NS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  parent.appendChild(e);
+  return e;
+}
+function put(node, key, val, fn) { const c = node._c || (node._c = {}); if (c[key] === val) return; c[key] = val; fn(val); }
+const rad = d => d * Math.PI / 180;
+const TH = i => -90 - 72 * i;
+const PHI = f => TH(f) + 36;
+const pol = (r, deg) => [r * Math.cos(rad(deg)), r * Math.sin(rad(deg))];
+const R_PH = 240, R_PLATE = 108, R_FORK = 116, RING_C = 2 * Math.PI * 35;
+const SIDE = [1, -1, -1, 1, 1];
+const fx = v => v.toFixed(1);
+function seg(a, b, ra, rb, hs) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
+  const x1 = a[0] + ux * ra, y1 = a[1] + uy * ra, x2 = b[0] - ux * rb, y2 = b[1] - uy * rb;
+  const an = Math.atan2(uy, ux), h1 = an + Math.PI - 0.5, h2 = an + Math.PI + 0.5;
+  return {line: `M${fx(x1)} ${fx(y1)}L${fx(x2)} ${fx(y2)}`,
+          head: `M${fx(x2 + hs * Math.cos(h1))} ${fx(y2 + hs * Math.sin(h1))}L${fx(x2)} ${fx(y2)}L${fx(x2 + hs * Math.cos(h2))} ${fx(y2 + hs * Math.sin(h2))}`};
+}
+
+/* retratos ilustrados */
+const INK = '#2A1E1A';
+function portrait(parent, i, clipId) {
+  const P = PEOPLE[i];
+  const clip = el('g', {'clip-path': 'url(#' + clipId + ')'}, parent);
+  const g = el('g', {class: 'portrait'}, clip);
+  el('path', {d: 'M-42 54 Q-40 22 0 19 Q40 22 42 54 Z', fill: P.toga}, g);
+  if (P.style === 'descartes') el('path', {d: 'M-16 20 L0 32 L16 20 Q0 25 -16 20Z', fill: P.sash}, g);
+  else el('path', {d: 'M-24 24 Q2 31 20 54', stroke: P.sash, 'stroke-width': 5, fill: 'none'}, g);
+  el('rect', {x: -5, y: 8, width: 10, height: 13, fill: P.skin}, g);
+  const head = el('g', {class: 'head'}, g);
+  if (P.style === 'platao') el('circle', {cy: -5, r: 20, fill: P.hair}, head);
+  if (P.style === 'hipatia') { el('ellipse', {cy: 3, rx: 21, ry: 23, fill: P.hair}, head); el('circle', {cy: -23, r: 8, fill: P.hair}, head); }
+  if (P.style === 'descartes') el('path', {d: 'M-22 -6 Q-27 16 -20 27 L20 27 Q27 16 22 -6 Q20 -23 0 -23 Q-20 -23 -22 -6Z', fill: P.hair}, head);
+  el('circle', {cx: -17, cy: -1, r: 3.5, fill: P.skin}, head);
+  el('circle', {cx: 17, cy: -1, r: 3.5, fill: P.skin}, head);
+  el('circle', {cy: -2, r: 17, fill: P.skin}, head);
+  switch (P.style) {
+    case 'socrates':
+      el('circle', {cx: -16, cy: -7, r: 6, fill: P.hair}, head); el('circle', {cx: 16, cy: -7, r: 6, fill: P.hair}, head);
+      el('path', {d: 'M-8 -14 Q0 -17 8 -14', stroke: '#C08A62', 'stroke-width': 1.4, fill: 'none', 'stroke-linecap': 'round'}, head); break;
+    case 'platao':
+      [[-11, -17], [0, -20], [11, -17]].forEach(([x, y]) => el('circle', {cx: x, cy: y, r: 6.5, fill: P.hair}, head)); break;
+    case 'aristoteles':
+      el('path', {d: 'M-17 -4 Q-18 -22 0 -21 Q18 -22 17 -4 Q10 -14 0 -13 Q-10 -14 -17 -4Z', fill: P.hair}, head); break;
+    case 'hipatia':
+      el('path', {d: 'M-17 -1 Q-16 -20 0 -19 Q16 -20 17 -1 Q12 -12 0 -12 Q-12 -12 -17 -1Z', fill: P.hair}, head);
+      el('circle', {cx: -17, cy: 5, r: 2, fill: '#E8B647'}, head); el('circle', {cx: 17, cy: 5, r: 2, fill: '#E8B647'}, head); break;
+    case 'descartes':
+      el('path', {d: 'M-17 -3 Q-16 -19 0 -19 Q16 -19 17 -3 Q9 -14 0 -12 Q-9 -14 -17 -3Z', fill: P.hair}, head); break;
+  }
+  if (P.style === 'socrates') el('path', {d: 'M-16 1 Q-18 24 0 28 Q18 24 16 1 Q9 11 0 11 Q-9 11 -16 1Z', fill: P.beard}, head);
+  if (P.style === 'platao') el('path', {d: 'M-16 1 Q-16 32 0 34 Q16 32 16 1 Q9 11 0 11 Q-9 11 -16 1Z', fill: P.beard}, head);
+  if (P.style === 'aristoteles') el('path', {d: 'M-15 3 Q-14 19 0 20 Q14 19 15 3 Q8 11 0 11 Q-8 11 -15 3Z', fill: P.beard}, head);
+  if (P.style === 'descartes') {
+    el('path', {d: 'M-7 5 Q-3 2.5 0 4.5 Q3 2.5 7 5', stroke: P.hair, 'stroke-width': 2, fill: 'none', 'stroke-linecap': 'round'}, head);
+    el('ellipse', {cy: 13.5, rx: 2.5, ry: 3.5, fill: P.hair}, head);
+  }
+  if (P.style === 'socrates') el('circle', {cy: 1.5, r: 3.2, fill: '#C9906A'}, head);
+  else el('path', {d: 'M0 -3 L-2.2 3 L1.5 3.4', stroke: '#B07B58', 'stroke-width': 1.4, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round'}, head);
+  const LN = {stroke: INK, 'stroke-width': 1.8, fill: 'none', 'stroke-linecap': 'round'};
+  let e = el('g', {class: 'ex ex-pensando'}, head);
+  el('circle', {cx: -5, cy: -5, r: 2, fill: INK}, e); el('circle', {cx: 7, cy: -5, r: 2, fill: INK}, e);
+  el('path', Object.assign({d: 'M-10 -10 L-3 -11.5 M3 -11.5 L10 -10'}, LN), e);
+  el('path', Object.assign({d: 'M-2 8 L4 7'}, LN), e);
+  el('circle', {cx: 21, cy: -24, r: 2.2, class: 'tdot'}, e); el('circle', {cx: 27, cy: -30, r: 3.4, class: 'tdot'}, e);
+  e = el('g', {class: 'ex ex-fome'}, head);
+  el('circle', {cx: -6, cy: -3, r: 2.7, fill: INK}, e); el('circle', {cx: 6, cy: -3, r: 2.7, fill: INK}, e);
+  el('path', Object.assign({d: 'M-10 -8 L-3 -11 M3 -11 L10 -8'}, LN), e);
+  el('ellipse', {cy: 8, rx: 3, ry: 3.6, fill: INK}, e);
+  el('path', {d: 'M19 -17 Q15.5 -11 19 -9 Q22.5 -11 19 -17Z', fill: '#7EC8F2'}, e);
+  e = el('g', {class: 'ex ex-comendo'}, head);
+  el('path', Object.assign({d: 'M-9 -3 Q-6 -6.5 -3 -3 M3 -3 Q6 -6.5 9 -3'}, LN), e);
+  el('path', {d: 'M-5 5 Q0 12 5 5Z', fill: INK}, e);
+  el('path', {d: 'M1 9 Q3 14 0 19', stroke: '#E8B647', 'stroke-width': 2.4, fill: 'none', 'stroke-linecap': 'round'}, e);
+  el('circle', {cx: -11, cy: 3, r: 2.6, fill: '#F29A9A', opacity: .75}, e); el('circle', {cx: 11, cy: 3, r: 2.6, fill: '#F29A9A', opacity: .75}, e);
+  e = el('g', {class: 'ex ex-dead'}, head);
+  el('circle', {cy: -2, r: 17, fill: '#E5484D', opacity: .2}, e);
+  el('path', Object.assign({d: 'M-10 -10 L-3 -6.5 M3 -6.5 L10 -10'}, LN, {'stroke-width': 2.4}), e);
+  el('circle', {cx: -6, cy: -3, r: 1.9, fill: INK}, e); el('circle', {cx: 6, cy: -3, r: 1.9, fill: INK}, e);
+  el('path', Object.assign({d: 'M-5 10 Q0 5 5 10'}, LN), e);
+  el('path', {d: 'M17 -25 l3.5 3.5 M24 -25 l-3.5 3.5 M17 -17 l3.5 -3.5 M24 -17 l-3.5 -3.5', stroke: '#E5484D', 'stroke-width': 2.4, 'stroke-linecap': 'round'}, e);
+  return g;
+}
+
+const forkEl = [], phEl = [], arrowEl = [];
+let cNum, cSala, stamp, stampTxt;
+
+function buildStage() {
+  const defs = el('defs', {}, svg);
+  el('circle', {r: 41}, el('clipPath', {id: 'face-clip'}, defs));
+
+  el('circle', {r: 182, class: 'tabletop'}, svg);
+  const unit = [[0,0],[0,1],[0.72,1],[0.72,0.36],[0.34,0.36],[0.34,0.68]];
+  const M = 50, r0 = 160, r1 = 173;
+  let d = '';
+  for (let k = 0; k < M; k++) unit.forEach(([u, v], j) => {
+    const [x, y] = pol(r0 + v * (r1 - r0), (k + u) * 360 / M);
+    d += (j ? 'L' : 'M') + fx(x) + ' ' + fx(y);
+  });
+  el('circle', {r: r0, class: 'meander'}, svg);
+  el('path', {d, class: 'meander'}, svg);
+  for (let f = 0; f < N; f++) {
+    const [x, y] = pol(147, PHI(f));
+    el('circle', {cx: x, cy: y, r: 9.5, class: 'slot-bg'}, svg);
+    el('text', {x, y, class: 'slot'}, svg, String(f));
+  }
+  el('text', {y: -26, class: 'c-label'}, svg, 'REFEIÇÕES');
+  cNum = el('text', {y: 16, class: 'c-num'}, svg, '0');
+  cSala = el('text', {y: 42, class: 'c-sala'}, svg, '');
+
+  const rings = [];
+  for (let i = 0; i < N; i++) {
+    const [x, y] = pol(R_PLATE, TH(i));
+    const g = el('g', {transform: `translate(${fx(x)} ${fx(y)})`}, svg);
+    rings.push(el('circle', {r: 35, class: 'ring', transform: 'rotate(-90)', 'stroke-dasharray': fx(RING_C)}, g));
+    el('circle', {r: 30, class: 'plate'}, g);
+    el('circle', {r: 22, class: 'plate-in'}, g);
+    el('circle', {r: 14, class: 'pasta'}, g);
+    el('path', {d: 'M-9 -3 q5 -7 10 0 t9 1 M-8 5 q6 -6 11 0 t6 -1', class: 'pasta-l'}, g);
+  }
+  for (let i = 0; i < N; i++) arrowEl.push(el('path', {class: 'arrow', d: ''}, svg));
+  for (let f = 0; f < N; f++) {
+    const g = el('g', {class: 'fork'}, svg);
+    el('title', {}, g, 'hashi ' + f);
+    el('polygon', {points: '-1.7,-25 1.7,-25 3.3,25 -3.3,25'}, g);
+    forkEl.push(g);
+  }
+
+  for (let i = 0; i < N; i++) {
+    const [x, y] = pol(R_PH, TH(i)), s = SIDE[i];
+    const g = el('g', {class: 'phil s-pensando', transform: `translate(${fx(x)} ${fx(y)})`}, svg);
+    el('title', {}, g, NAMES[i] + ' (processo ' + i + ')');
+    el('circle', {r: 50, class: 'spot-ring'}, g);
+    el('circle', {r: 44, class: 'pulse'}, g);
+    el('circle', {r: 44, class: 'disc'}, g);
+    portrait(g, i, 'face-clip');
+    el('circle', {cx: 33, cy: -31, r: 13, class: 'badge'}, g);
+    const badge = el('text', {x: 33, y: -30.5, class: 'badge-t'}, g, '0');
+    const below = y > 60;
+    el('text', {y: below ? 74 : -80, class: 'pname'}, g, NAMES[i]);
+    const state = el('text', {y: below ? 96 : -58, class: 'pstate'}, g, 'pensando');
+    const b = el('g', {class: 'bubble'}, g);
+    const bx = s > 0 ? 54 : -206;
+    el('rect', {x: bx, y: -37, width: 152, height: 74, rx: 13}, b);
+    el('path', {class: 'tail', d: s > 0 ? 'M55 -9 L42 3 L55 6Z' : 'M-55 -9 L-42 3 L-55 6Z'}, b);
+    el('path', {class: 'patch', d: s > 0 ? 'M55 -7 L55 4.5' : 'M-55 -7 L-55 4.5'}, b);
+    const ts = [0, 1, 2].map(() => el('text', {x: bx + 76, y: 0, class: 'btxt'}, b, ''));
+    g.addEventListener('click', () => philClick(i));
+    g.addEventListener('mouseenter', () => { sel = i; });
+    phEl.push({g, badge, state, ring: rings[i], bubble: b, ts});
+  }
+
+  stamp = el('g', {class: 'stamp'}, svg);
+  el('rect', {x: -150, y: -38, width: 300, height: 76, rx: 10}, stamp);
+  stampTxt = el('text', {y: 2}, stamp, 'DEADLOCK');
+}
+
+/* grafo de alocação de recursos */
+const RAG_R = 112, ragP = [], ragR = [], ragPath = {};
+const ragPos = (kind, i) => kind === 'P' ? pol(RAG_R, TH(i)) : pol(RAG_R, PHI(i));
+function buildRag() {
+  el('circle', {r: 41}, el('clipPath', {id: 'rag-clip'}, el('defs', {}, rag)));
+  ['a', 'q', 'hq', 'ad', 'qd'].forEach(k => { ragPath[k] = el('path', {class: 'rag-' + k, d: ''}, rag); });
+  for (let f = 0; f < N; f++) {
+    const [x, y] = ragPos('R', f);
+    const g = el('g', {transform: `translate(${fx(x)} ${fx(y)})`}, rag);
+    el('title', {}, g, 'hashi ' + f);
+    ragR.push(el('rect', {x: -14, y: -14, width: 28, height: 28, rx: 4, class: 'rag-r'}, g));
+    el('text', {class: 'rag-t'}, g, String(f));
+  }
+  for (let i = 0; i < N; i++) {
+    const [x, y] = ragPos('P', i);
+    const g = el('g', {transform: `translate(${fx(x)} ${fx(y)})`, class: 's-pensando'}, rag);
+    el('title', {}, g, NAMES[i]);
+    el('circle', {r: 20, class: 'disc rag-p'}, g);
+    portrait(el('g', {transform: 'scale(.44)'}, g), i, 'rag-clip');
+    ragP.push(g);
+  }
+}
+function renderRag(deadSet) {
+  const acc = {a: '', q: '', hq: '', ad: '', qd: ''};
+  const deadF = new Set();
+  S.ph.forEach(p => { if (deadSet.includes(p.i)) { const w = waitsFor(p); if (w) deadF.add(w.f); } });
+  for (let f = 0; f < N; f++) {
+    const h = S.forks[f];
+    put(ragR[f], 'held', h !== null, v => ragR[f].setAttribute('class', 'rag-r' + (v ? ' held' : '')));
+    if (h === null) continue;
+    const s = seg(ragPos('R', f), ragPos('P', h), 16, 22, 8);
+    acc[deadF.has(f) ? 'ad' : 'a'] += s.line + s.head;
+  }
+  S.ph.forEach(p => {
+    const dead = deadSet.includes(p.i);
+    const g = ragP[p.i];
+    put(g, 'cls', dead ? 'dead' : p.status, v => g.setAttribute('class', 's-' + v));
+    const targets = [], w = waitsFor(p);
+    if (w) targets.push(w.f);
+    else if (cur(p).k === 'both' && p.blockedOn) targets.push(L(p.i), R(p.i));
+    targets.forEach(f => {
+      const s = seg(ragPos('P', p.i), ragPos('R', f), 22, 16, 8);
+      if (dead) { acc.qd += s.line; acc.ad += s.head; } else { acc.q += s.line; acc.hq += s.head; }
+    });
+  });
+  for (const k in acc) put(ragPath[k], 'd', acc[k], v => ragPath[k].setAttribute('d', v));
+}
+
+/* ficha do processo */
+const pcbFaces = [], pickBtn = [];
+let pcbWrap;
+function buildPcb() {
+  const fs = $('pcb-face');
+  el('circle', {r: 41}, el('clipPath', {id: 'pcb-clip'}, el('defs', {}, fs)));
+  pcbWrap = el('g', {class: 's-pensando'}, fs);
+  el('circle', {r: 44, class: 'disc', 'stroke-width': 4}, pcbWrap);
+  for (let i = 0; i < N; i++) { const g = el('g', {}, pcbWrap); portrait(g, i, 'pcb-clip'); pcbFaces.push(g); }
+  const pick = $('pcb-pick');
+  for (let i = 0; i < N; i++) {
+    const b = document.createElement('button'); b.type = 'button'; b.id = 'pick-' + i; b.textContent = NAMES[i];
+    b.addEventListener('click', () => { sel = i; });
+    pick.append(b); pickBtn.push(b);
+  }
+}
+function renderPcb(deadSet) {
+  const p = S.ph[sel], dead = deadSet.includes(sel), info = pcbInfo(p, dead);
+  put(pcbWrap, 'cls', dead ? 'dead' : p.status, v => pcbWrap.setAttribute('class', 's-' + v));
+  pcbFaces.forEach((g, i) => put(g, 'vis', i === sel, v => { g.style.display = v ? '' : 'none'; }));
+  pickBtn.forEach((b, i) => put(b, 'on', i === sel, v => b.setAttribute('aria-pressed', v ? 'true' : 'false')));
+  put($('pcb-name'), 't', NAMES[sel], v => { $('pcb-name').textContent = v; });
+  put($('pcb-sub'), 't', 'processo ' + sel + ' (P' + sel + ' nos slides) · ' + p.meals + (p.meals === 1 ? ' refeição' : ' refeições'), v => { $('pcb-sub').textContent = v; });
+  const key = [info.estado, info.segura, info.pede, info.linha].join('|');
+  const dl = $('pcb-dl');
+  put(dl, 'k', key, () => {
+    dl.textContent = '';
+    [['Estado', info.estado], ['Segura', info.segura], ['Pede', info.pede], ['Linha', info.linha]].forEach(([k, v], n) => {
+      const dt = document.createElement('dt'); dt.textContent = k;
+      const dd = document.createElement('dd');
+      if (n === 3) { const c = document.createElement('code'); c.textContent = v; dd.append(c); } else dd.textContent = v;
+      dl.append(dt, dd);
+    });
+  });
+  put($('pcb-why'), 't', info.why, v => { $('pcb-why').textContent = v; });
+}
+
+function forkPose(f) {
+  const h = S.forks[f];
+  if (h === null) { const [x, y] = pol(R_FORK, PHI(f)); return [x, y, PHI(f) - 90]; }
+  const isLeft = h === f, s = isLeft ? 1 : -1, th = TH(h);
+  const [px, py] = pol(R_PLATE, th);
+  return [px - s * 46 * Math.sin(rad(th)), py + s * 46 * Math.cos(rad(th)), PHI(f) - 90 + (isLeft ? -36 : 36)];
+}
+
+function statusInfo() {
+  if (S.deadlock) return {kind: 'dead', title: 'Deadlock', text: mode === 'manual'
+    ? 'Você travou o jantar em ' + S.clicks + ' cliques. Ciclo: ' + cycleText(S.deadlock) + '. Cada um segura um hashi e espera o do vizinho.'
+    : 'Ciclo: ' + cycleText(S.deadlock) + '. Cada um segura um hashi e espera o do vizinho. Ninguém solta, ninguém come. Só reiniciando.'};
+  if (S.teach) return {kind: 'teach', title: S.teach.title, text: S.teach.text};
+  if (isLivelock()) return {kind: 'live', title: 'Livelock', text: 'Todos pegam e soltam no mesmo ritmo. Há atividade, mas nenhum progresso: ' + S.failsSinceMeal + ' tentativas seguidas sem uma refeição.'};
+  const st = S.ph.find(p => p.status === 'fome' && p.over >= 4);
+  if (st) return {kind: 'starve', title: 'Inanição', text: nm(st.i) + ' continua com fome e já viu os vizinhos comerem ' + st.over + ' vezes.'};
+  if (mode === 'manual') return {kind: 'ok', title: 'Sua missão', text: strat.missao};
+  return {kind: 'ok', title: running ? 'Em andamento' : 'Pausado', text: strat.obs};
+}
+
+const codeRows = [];
+function buildCode() {
+  const outer = $('code'); outer.textContent = ''; codeRows.length = 0;
+  const box = document.createElement('div'); box.className = 'rows'; outer.append(box);
+  strat.codigo.forEach((txt, n) => {
+    const row = document.createElement('div'); row.className = 'ln';
+    const num = document.createElement('span'); num.className = 'n'; num.textContent = n + 1;
+    const code = document.createElement('code');
+    const k = txt.indexOf('//');
+    if (k >= 0) { code.append(txt.slice(0, k)); const c = document.createElement('span'); c.className = 'c'; c.textContent = txt.slice(k); code.append(c); }
+    else code.textContent = txt || ' ';
+    const pcs = document.createElement('span'); pcs.className = 'pcs';
+    row.append(num, code, pcs); box.append(row); codeRows.push({row, pcs});
+  });
+}
+const coffRows = [];
+function buildTheory() {
+  $('strat-name').textContent = strat.titulo;
+  $('strat-desc').textContent = strat.desc;
+  const ul = $('coffman'); ul.textContent = ''; coffRows.length = 0;
+  COFFMAN.forEach(([nome, def], k) => {
+    const li = document.createElement('li');
+    const b = document.createElement('b'); b.textContent = (k + 1) + '. ' + nome;
+    const sm = document.createElement('small'); sm.textContent = def;
+    const lamp = document.createElement('span'); lamp.className = 'lamp';
+    const dot = document.createElement('i'); const lt = document.createElement('span');
+    lamp.append(lt, dot);
+    li.append(b, lamp, sm); ul.append(li);
+    coffRows.push({li, sm, lt, def, off: strat.quebra === k});
+  });
+  $('why').textContent = strat.porque;
+  const v = $('verdict'); v.textContent = '';
+  const chip = (cls, txt) => { const s = document.createElement('span'); s.className = cls; s.textContent = txt; v.append(s); };
+  chip(strat.dead ? 'bad' : 'good', strat.dead ? 'Deadlock: possível' : 'Deadlock: impossível');
+  chip(strat.live ? 'warn' : 'good', strat.live ? 'Livelock: possível' : 'Livelock: não ocorre');
+  chip('warn', 'Inanição: possível');
+  $('rand-wrap').hidden = stratKey !== 'desiste';
+}
+
+const stepBtn = [];
+function buildSteps() {
+  const box = $('steps');
+  for (let i = 0; i < N; i++) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'step'; b.id = 'step-' + i;
+    const t = document.createElement('b'); t.textContent = NAMES[i];
+    const s = document.createElement('span');
+    b.append(t, s); box.append(b);
+    b.addEventListener('click', () => manualStep(i));
+    stepBtn.push({b, s});
+  }
+}
+
+function renderLog() {
+  const ul = $('log');
+  put(ul, 'v', logVer, () => {
+    ul.textContent = '';
+    if (!LOG.length) {
+      const li = document.createElement('li'); li.className = 'empty';
+      li.textContent = 'Os eventos aparecem aqui conforme os filósofos pedem, usam e soltam hashis.';
+      ul.append(li); return;
+    }
+    LOG.forEach(e => {
+      const li = document.createElement('li');
+      const t = document.createElement('i'); t.className = 'ltag ' + e.tag; t.textContent = e.tag;
+      const s = document.createElement('span'); s.textContent = e.text;
+      li.append(t, s); ul.append(li);
+    });
+  });
+}
+
+function render() {
+  const deadSet = S.deadlock || [];
+  const spot = mode === 'guia' ? (TOUR[tourIdx].spot || []) : [];
+  for (let f = 0; f < N; f++) {
+    const [x, y, r] = forkPose(f), h = S.forks[f];
+    put(forkEl[f], 'tf', `translate(${fx(x)}px,${fx(y)}px) rotate(${r}deg)`, v => { forkEl[f].style.transform = v; });
+    put(forkEl[f], 'cls', 'fork' + (h === null ? '' : deadSet.includes(h) ? ' dead' : ' held'), v => forkEl[f].setAttribute('class', v));
+  }
+  const byLine = {};
+  S.ph.forEach(p => {
+    const e = phEl[p.i], dead = deadSet.includes(p.i), cls = dead ? 'dead' : p.status;
+    put(e.g, 'cls', 'phil s-' + cls + (spot.includes(p.i) ? ' spot' : ''), v => e.g.setAttribute('class', v));
+    put(e.state, 'txt', stateText(p, dead), v => { e.state.textContent = v; });
+    put(e.badge, 'txt', String(p.meals), v => { e.badge.textContent = v; });
+    const lines = bubbleLines(p, dead);
+    put(e.bubble, 't', lines.join('|'), () => {
+      const y0 = -(lines.length - 1) * 10;
+      e.ts.forEach((t, k) => { t.textContent = lines[k] || ''; t.setAttribute('y', fx(y0 + k * 20)); });
+      e.bubble.classList.remove('pop'); void e.bubble.getBBox(); e.bubble.classList.add('pop');
+    });
+    const eating = p.status === 'comendo';
+    const frac = eating ? (mode === 'auto' ? Math.max(0, Math.min(1, p.t / p.eatDur)) : 1) : 0;
+    put(e.ring, 'off', (RING_C * (1 - frac)).toFixed(0), v => { e.ring.style.strokeDashoffset = v; });
+    put(e.ring, 'vis', eating, v => { e.ring.style.opacity = v ? 1 : 0; });
+
+    const w = waitsFor(p); let d = '';
+    if (w) { const s = seg(pol(R_PLATE, TH(p.i)), forkPose(w.f), 38, 14, 11); d = s.line + s.head; }
+    put(arrowEl[p.i], 'd', d, v => arrowEl[p.i].setAttribute('d', v));
+    put(arrowEl[p.i], 'cls', dead ? 'arrow dead' : 'arrow', v => arrowEl[p.i].setAttribute('class', v));
+
+    const op = cur(p), line = (op.blockLine != null && p.blockedOn) ? op.blockLine : op.line;
+    (byLine[line] || (byLine[line] = [])).push('<i class="chip s-' + cls + '" title="' + NAMES[p.i] + '">' + INI[p.i] + '</i>');
+  });
+  codeRows.forEach((r, n) => {
+    const html = (byLine[n] || []).join('');
+    put(r.pcs, 'h', html, v => { r.pcs.innerHTML = v; r.row.classList.toggle('on', v !== ''); });
+  });
+
+  put(cNum, 't', String(S.total), v => { cNum.textContent = v; });
+  put(cSala, 't', stratKey === 'garcom' ? 'lugares livres: ' + S.sala : '', v => { cSala.textContent = v; });
+  const st = S.deadlock ? 'dl' : isLivelock() ? 'lv' : '';
+  put(stamp, 'st', st, v => {
+    stamp.setAttribute('class', 'stamp' + (v ? ' on' : '') + (v === 'lv' ? ' lv' : ''));
+    stampTxt.textContent = v === 'lv' ? 'LIVELOCK' : 'DEADLOCK';
+  });
+
+  const lc = liveConds(), focus = mode === 'guia' ? (TOUR[tourIdx].focus || []) : [];
+  let n = 0;
+  coffRows.forEach((r, k) => {
+    const now = lc[k];
+    if (now) n++;
+    put(r.li, 'cls', (now ? 'now' : '') + (now && k === 3 ? ' c3' : '') + (r.off ? ' off' : '') + (focus.includes(k) ? ' focus' : ''), v => { r.li.className = v; });
+    put(r.sm, 't', now ? 'Agora: ' + now : r.def, v => { r.sm.textContent = v; });
+    put(r.lt, 't', r.off ? 'quebrada' : now ? 'acontecendo' : 'apagada', v => { r.lt.textContent = v; });
+  });
+  const meter = $('meter');
+  put(meter, 'n', n, v => { [...meter.children].forEach((i, k) => i.classList.toggle('on', k < v)); meter.classList.toggle('all', v === 4); });
+  const nc = $('nowcount');
+  put(nc, 't', n === 4 ? 'As 4 condições ao mesmo tempo: deadlock.' : n + ' de 4 condições acontecendo agora', v => { nc.textContent = v; nc.classList.toggle('all', n === 4); });
+
+  renderRag(deadSet);
+  renderPcb(deadSet);
+
+  if (mode !== 'guia') {
+    const info = statusInfo(), box = $('status');
+    put(box, 'kind', info.kind, v => { box.dataset.kind = v; });
+    put($('status-title'), 't', info.title, v => { $('status-title').textContent = v; });
+    put($('status-text'), 't', info.text, v => { $('status-text').textContent = v; });
+    renderLog();
+  }
+  const run = $('btn-run');
+  put(run, 't', S.deadlock ? 'Travado' : running ? 'Pausar' : 'Continuar', v => { run.textContent = v; });
+  put(run, 'dis', !!S.deadlock, v => { run.disabled = v; });
+  if (mode === 'manual') {
+    S.ph.forEach(p => {
+      const nl = nextLabel(p), dis = nl.dis || !!S.deadlock, e = stepBtn[p.i];
+      put(e.s, 't', S.deadlock ? 'travado' : nl.t, v => { e.s.textContent = v; });
+      put(e.b, 'dis', dis, v => e.b.setAttribute('aria-disabled', v ? 'true' : 'false'));
+    });
+    put($('clicks'), 't', S.clicks + (S.clicks === 1 ? ' clique' : ' cliques'), v => { $('clicks').textContent = v; });
+  }
+}
+
+/* ---------- aula guiada ---------- */
+const dotEl = [];
+function buildTour() {
+  const box = $('tour-dots');
+  TOUR.forEach((st, k) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.id = 'tour-dot-' + k;
+    b.setAttribute('aria-label', 'Passo ' + (k + 1) + ': ' + st.title);
+    b.title = st.title;
+    b.addEventListener('click', () => applyTour(k));
+    box.append(b); dotEl.push(b);
+  });
+}
+function renderQuiz(st) {
+  const box = $('quiz'), opts = $('quiz-opts'), why = $('quiz-why');
+  box.hidden = !st.quiz; opts.textContent = ''; why.hidden = true;
+  if (!st.quiz) return;
+  $('quiz-q').textContent = st.quiz.q;
+  st.quiz.opts.forEach((t, k) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'qopt'; b.textContent = t;
+    b.addEventListener('click', () => {
+      const ok = k === st.quiz.ok;
+      b.classList.add(ok ? 'right' : 'wrong');
+      if (ok) {
+        [...opts.children].forEach(x => { x.disabled = true; });
+        why.textContent = 'Isso! ' + st.quiz.why; why.hidden = false; sfx('usar');
+      } else { b.disabled = true; why.textContent = 'Ainda não. Pense em quem segura qual hashi e tente outra.'; why.hidden = false; sfx('espera'); }
+    });
+    opts.append(b);
+  });
+}
+function applyTour(k) {
+  tourIdx = Math.max(0, Math.min(TOUR.length - 1, k));
+  const st = TOUR[tourIdx];
+  if (st.strat !== stratKey) setStrat(st.strat);
+  syncPills();
+  muted = true;
+  if (st.live) {
+    randBackoff = false; $('rand-backoff').checked = false;
+    reset(true); running = true;
+  } else {
+    running = false; reset(false);
+    st.do.forEach(a => { if (a === 'rb4') rollback(4); else doStep(a); });
+    S.deadlock = detect();
+  }
+  muted = false;
+  if (st.spot && st.spot.length) sel = st.spot[0];
+  if (S.deadlock) sfx('deadlock'); else if (!st.live && st.do.length) sfx('solicitar');
+  $('narr-step').textContent = 'Passo ' + (tourIdx + 1) + ' de ' + TOUR.length;
+  $('narr-slide').textContent = st.slide;
+  $('narr-title').textContent = st.title;
+  $('narr-text').textContent = st.text;
+  renderQuiz(st);
+  $('tour-prev').disabled = tourIdx === 0;
+  $('tour-next').textContent = tourIdx === TOUR.length - 1 ? 'Recomeçar' : 'Próximo';
+  dotEl.forEach((d, j) => {
+    d.className = 'dot' + (TOUR[j].quiz ? ' q' : '') + (j === tourIdx ? ' on' : j < tourIdx ? ' done' : '');
+    d.setAttribute('aria-current', j === tourIdx ? 'step' : 'false');
+  });
+  render();
+}
+
+/* ---------- eventos ---------- */
+function philClick(i) {
+  sel = i;
+  if (mode === 'manual') { manualStep(i); return; }
+  if (mode !== 'auto') return;
+  const p = S.ph[i];
+  if (!S.deadlock && cur(p).k === 'think') { p.t = 0; if (!running) { running = true; S.teach = null; } }
+}
+function setStrat(key) { stratKey = key; strat = STRATS[key]; buildCode(); buildTheory(); reset(false); }
+function syncPills() { const r = $('strat-' + stratKey); if (r) r.checked = true; }
+function setMode(m) {
+  mode = m;
+  $('mode-' + m).checked = true;
+  $('auto-controls').hidden = m !== 'auto';
+  $('manual-controls').hidden = m !== 'manual';
+  $('narr').hidden = m !== 'guia';
+  $('status').hidden = m === 'guia';
+  $('log-block').hidden = m === 'guia';
+  if (m === 'guia') { applyTour(tourIdx); return; }
+  running = m === 'auto' && !reduceMotion;
+  reset(false);
+}
+
+function boot() {
+  const pills = $('strat-pills');
+  Object.keys(STRATS).forEach((key, n) => {
+    const lab = document.createElement('label'); lab.className = 'pill';
+    const inp = document.createElement('input'); inp.type = 'radio'; inp.name = 'strat'; inp.id = 'strat-' + key; inp.value = key; inp.checked = n === 0;
+    const sp = document.createElement('span'); sp.textContent = STRATS[key].pill;
+    lab.append(inp, sp); pills.append(lab);
+    inp.addEventListener('change', () => {
+      if (!inp.checked) return;
+      setStrat(key);
+      if (mode === 'guia') setMode('auto');
+      inp.blur();
+    });
+  });
+
+  buildStage(); buildRag(); buildPcb(); buildSteps(); buildTour(); buildCode(); buildTheory(); reset(false);
+
+  document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', () => { if (r.checked) { setMode(r.value); r.blur(); } }));
+  $('tour-prev').addEventListener('click', () => applyTour(tourIdx - 1));
+  $('tour-next').addEventListener('click', () => applyTour(tourIdx === TOUR.length - 1 ? 0 : tourIdx + 1));
+  $('btn-run').addEventListener('click', () => { running = !running; S.teach = null; });
+  $('btn-reset').addEventListener('click', () => reset(false));
+  $('btn-reset-m').addEventListener('click', () => reset(false));
+  $('btn-sync').addEventListener('click', () => { reset(true); running = true; });
+  const sp = $('speed');
+  const syncSpeed = () => { speed = parseFloat(sp.value) || 1; $('speed-out').textContent = String(speed).replace('.', ',') + '×'; };
+  sp.addEventListener('input', syncSpeed); syncSpeed();
+  const rb = $('rand-backoff');
+  rb.addEventListener('change', () => { randBackoff = rb.checked; }); randBackoff = rb.checked;
+  const ob = $('opt-bubbles');
+  const syncBubbles = () => svg.classList.toggle('no-bubbles', !ob.checked);
+  ob.addEventListener('change', syncBubbles); syncBubbles();
+  $('opt-sound').addEventListener('change', e => { if (e.target.checked) sfx('usar'); });
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const tg = e.target && e.target.tagName;
+    if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT') return;
+    if (mode === 'guia') {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); if (tourIdx < TOUR.length - 1) applyTour(tourIdx + 1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); applyTour(tourIdx - 1); }
+    } else if (mode === 'manual' && e.key >= '0' && e.key <= '4') manualStep(+e.key);
+  });
+
+  const start = document.querySelector('input[name="mode"]:checked');
+  setMode(start ? start.value : 'guia');
+
+  let prev = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.1, (now - prev) / 1000); prev = now;
+    const live = mode === 'auto' || (mode === 'guia' && TOUR[tourIdx].live);
+    if (live && running && !S.deadlock) {
+      tick(dt * speed); S.deadlock = detect(); checkDead();
+      if (mode === 'auto') teachCheck();
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+boot();
+})();
+</script>
+</body>
+</html>
